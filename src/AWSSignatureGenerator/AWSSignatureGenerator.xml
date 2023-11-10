@@ -1,0 +1,225 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>AWSSignatureGenerator</name>
+    </assembly>
+    <members>
+        <member name="T:AWSSignatureGenerator.V4PayloadHashEnum">
+            <summary>
+            V4 payload hash.
+            </summary>
+        </member>
+        <member name="F:AWSSignatureGenerator.V4PayloadHashEnum.IsStreaming">
+            <summary>
+            Streaming payload.
+            </summary>
+        </member>
+        <member name="F:AWSSignatureGenerator.V4PayloadHashEnum.Unsigned">
+            <summary>
+            Unsigned payload.
+            </summary>
+        </member>
+        <member name="F:AWSSignatureGenerator.V4PayloadHashEnum.Signed">
+            <summary>
+            Signed payload.
+            </summary>
+        </member>
+        <member name="T:AWSSignatureGenerator.V4SignatureResult">
+            <summary>
+            V4 signature result.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.StreamBufferSize">
+            <summary>
+            Stream buffer size.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.Timestamp">
+            <summary>
+            Timestamp.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.AccessKey">
+            <summary>
+            Access key.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.SecretKey">
+            <summary>
+            Secret key.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.Region">
+            <summary>
+            AWS region.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.Service">
+            <summary>
+            AWS service.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.Protocol">
+            <summary>
+            Protocol.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.HttpMethod">
+            <summary>
+            HTTP method.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.FullUrl">
+            <summary>
+            Full URL.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.Port">
+            <summary>
+            Port.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.Hostname">
+            <summary>
+            Hostname.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.FullUrlWithoutQuery">
+            <summary>
+            Full URL without query.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.Path">
+            <summary>
+            Path.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.Querystring">
+            <summary>
+            Querystring.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.QueryElements">
+            <summary>
+            Querystring elements.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.HostHeader">
+            <summary>
+            Host header.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.CanonicalUri">
+            <summary>
+            Canonical URI.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.CanonicalQuerystring">
+            <summary>
+            Canonical querystring.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.CanonicalHeaders">
+            <summary>
+            Canonical headers.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.SignedHeaders">
+            <summary>
+            Signed headers.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.CanonicalRequest">
+            <summary>
+            Canonical request.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.StringToSign">
+            <summary>
+            String to sign.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.Headers">
+            <summary>
+            Headers.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.PayloadHash">
+            <summary>
+            Payload hashing method.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.HashedPayload">
+            <summary>
+            Hashed payload.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.RequestBodyType">
+            <summary>
+            Request body type.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.DateKey">
+            <summary>
+            Date key.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.RegionKey">
+            <summary>
+            Region key.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.ServiceKey">
+            <summary>
+            Service key.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.SigningKey">
+            <summary>
+            Signing key.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.Signature">
+            <summary>
+            Signature.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.AuthorizationHeader">
+            <summary>
+            Authorization header.
+            </summary>
+        </member>
+        <member name="M:AWSSignatureGenerator.V4SignatureResult.#ctor(System.String,System.String,System.String,System.String,System.String,System.String,System.String,System.Collections.Specialized.NameValueCollection,System.Object,AWSSignatureGenerator.V4PayloadHashEnum)">
+            <summary>
+            Instantiate.
+            </summary>
+            <param name="timestamp">Timestamp of the form yyyyMMddTHHmmssZ.</param>
+            <param name="httpMethod">HTTP method.</param>
+            <param name="fullUrl">Full URL.</param>
+            <param name="accessKey">Access key.</param>
+            <param name="secretKey">Secret key.</param>
+            <param name="region">Region.</param>
+            <param name="service">Service.</param>
+            <param name="headers">Request headers.</param>
+            <param name="requestBody">Request body (Stream, byte[], or string).</param>
+            <param name="payloadHashing">Payload hashing method.</param>
+        </member>
+        <member name="M:AWSSignatureGenerator.V4SignatureResult.ToString">
+            <summary>
+            Human-readable version of the object.
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:AWSSignatureGenerator.V4SignatureResult.Dispose(System.Boolean)">
+            <summary>
+            Dispose.
+            </summary>
+            <param name="disposing">Disposing.</param>
+        </member>
+        <member name="M:AWSSignatureGenerator.V4SignatureResult.Dispose">
+            <summary>
+            Dispose.
+            </summary>
+        </member>
+    </members>
+</doc>
