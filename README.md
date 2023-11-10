@@ -1,4 +1,4 @@
-![alt tag](https://github.com/jchristn/s3server/blob/master/assets/logo.ico)
+![alt tag](https://github.com/jchristn/AWSSignatureGenerator/raw/main/Assets/icon.ico)
 
 # AWSSignatureGenerator
 
