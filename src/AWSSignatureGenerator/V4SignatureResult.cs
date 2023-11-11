@@ -67,7 +67,7 @@
         /// <summary>
         /// AWS region.
         /// </summary>
-        public string Region { get; set; } = null;
+        public string Region { get; set; } = "us-west-1";
 
         /// <summary>
         /// AWS service.
@@ -364,7 +364,18 @@
         /// <summary>
         /// Headers.
         /// </summary>
-        public NameValueCollection Headers { get; set; } = new NameValueCollection(StringComparer.InvariantCultureIgnoreCase);
+        public NameValueCollection Headers
+        {
+            get
+            {
+                return _Headers;
+            }
+            set
+            {
+                if (value == null) _Headers = new NameValueCollection(StringComparer.InvariantCultureIgnoreCase);
+                _Headers = SortNameValueCollection(value);
+            }
+        }
 
         /// <summary>
         /// Payload hashing method.
@@ -507,6 +518,7 @@
         private string _HttpMethod = "GET";
         private string _FullUrl = null;
         private Uri _Uri;
+        private NameValueCollection _Headers = new NameValueCollection(StringComparer.InvariantCultureIgnoreCase);
 
         private static string _EmptySha256Hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
         private static string _AmazonTimestampFormatCompact = "yyyyMMddTHHmmssZ";
@@ -810,6 +822,27 @@
             {
                 return hash.ComputeHash(bytes);
             }
+        }
+
+        private NameValueCollection SortNameValueCollection(NameValueCollection nvc)
+        {
+            SortedDictionary<string, string> sorted = new SortedDictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
+
+            foreach (string key in nvc.AllKeys)
+            {
+                sorted.Add(key, nvc.Get(key));
+            }
+
+            sorted.OrderBy(k => k.Key);
+
+            NameValueCollection ret = new NameValueCollection(StringComparer.InvariantCultureIgnoreCase);
+
+            foreach (KeyValuePair<string, string> kvp in sorted)
+            {
+                ret.Add(kvp.Key, kvp.Value);
+            }
+
+            return ret;
         }
 
         #endregion
