@@ -356,7 +356,7 @@
                 ret += "AWS4-HMAC-SHA256\n";
                 ret += Timestamp + "\n";
                 ret += Timestamp.Substring(0, 8) + "/" + Region + "/" + Service + "/aws4_request\n";
-                ret += Convert.ToHexString(Sha256(Encoding.UTF8.GetBytes(CanonicalRequest))).ToLower();
+                ret += BytesToHexString(Sha256(Encoding.UTF8.GetBytes(CanonicalRequest))).ToLower();
                 return ret;
             }
         }
@@ -401,15 +401,15 @@
                 {
                     if (_RequestBodyStream != null)
                     {
-                        return Convert.ToHexString(Sha256(_RequestBodyStream)).ToLower();
+                        return BytesToHexString(Sha256(_RequestBodyStream)).ToLower();
                     }
                     else if (_RequestBodyBytes != null)
                     {
-                        return Convert.ToHexString(Sha256(_RequestBodyBytes)).ToLower();
+                        return BytesToHexString(Sha256(_RequestBodyBytes)).ToLower();
                     }
                     else if (_RequestBodyString != null)
                     {
-                        return Convert.ToHexString(Sha256(Encoding.UTF8.GetBytes(_RequestBodyString))).ToLower();
+                        return BytesToHexString(Sha256(Encoding.UTF8.GetBytes(_RequestBodyString))).ToLower();
                     }
 
                     return _EmptySha256Hash;
@@ -431,7 +431,7 @@
         {
             get
             {
-                if (_DateKey != null) return Convert.ToHexString(_DateKey).ToLower();
+                if (_DateKey != null) return BytesToHexString(_DateKey).ToLower();
                 return null;
             }
         }
@@ -443,7 +443,7 @@
         {
             get
             {
-                if (_DateRegionKey != null) return Convert.ToHexString(_DateRegionKey).ToLower();
+                if (_DateRegionKey != null) return BytesToHexString(_DateRegionKey).ToLower();
                 return null;
             }
         }
@@ -455,7 +455,7 @@
         {
             get
             {
-                if (_DateRegionServiceKey != null) return Convert.ToHexString(_DateRegionServiceKey).ToLower();
+                if (_DateRegionServiceKey != null) return BytesToHexString(_DateRegionServiceKey).ToLower();
                 return null;
             }
         }
@@ -467,7 +467,7 @@
         {
             get
             {
-                if (_SigningKey != null) return Convert.ToHexString(_SigningKey).ToLower();
+                if (_SigningKey != null) return BytesToHexString(_SigningKey).ToLower();
                 return null;
             }
         }
@@ -479,7 +479,7 @@
         {
             get
             {
-                return Convert.ToHexString(
+                return BytesToHexString(
                     HmacSha256(
                         _SigningKey,
                         Encoding.UTF8.GetBytes(StringToSign)
@@ -843,6 +843,14 @@
             }
 
             return ret;
+        }
+
+        private string BytesToHexString(byte[] bytes)
+        {
+            // NOT supported in netstandard2.1!
+            // return Convert.ToHexString(bytes);  
+
+            return BitConverter.ToString(bytes).Replace("-", "");
         }
 
         #endregion
