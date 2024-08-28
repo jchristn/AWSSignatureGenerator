@@ -249,7 +249,7 @@
 
                     for (int i = 0; i < sorted.AllKeys.Count(); i++)
                     {
-                        string key = Uri.EscapeDataString(sorted.GetKey(i));
+                        string key = UriEncode(sorted.GetKey(i));
                         string[] vals = sorted.GetValues(i);
 
                         if (vals == null || vals.Length < 1)
@@ -264,7 +264,7 @@
                             {
                                 if (added > 0) ret += "&";
                                 ret += key + "=";
-                                if (!String.IsNullOrEmpty(val)) ret += Uri.EscapeDataString(val);
+                                if (!String.IsNullOrEmpty(val)) ret += UriEncode(val);
                                 added++;
                             }
                         }
@@ -833,11 +833,10 @@
                 sorted.Add(key, nvc.Get(key));
             }
 
-            sorted.OrderBy(k => k.Key);
-
+            Dictionary<string, string> sortedDict = sorted.OrderBy(k => k.Key, StringComparer.Ordinal).ToDictionary(x => x.Key, x => x.Value);
             NameValueCollection ret = new NameValueCollection(StringComparer.InvariantCultureIgnoreCase);
 
-            foreach (KeyValuePair<string, string> kvp in sorted)
+            foreach (KeyValuePair<string, string> kvp in sortedDict)
             {
                 ret.Add(kvp.Key, kvp.Value);
             }
@@ -850,6 +849,18 @@
             // NOT supported in netstandard2.1!
             // return Convert.ToHexString(bytes);  
             return BitConverter.ToString(bytes).Replace("-", "");
+        }
+
+        private string UriEncode(string str)
+        {
+            /*
+             * Seem to be having issues with querystring parameters that contain "+"
+             * and this URL indicates that "+" should be encoded as "-"
+             * 
+             * https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/CreateSignatureInCSharp.html
+             * 
+             */
+            return Uri.EscapeDataString(str);
         }
 
         #endregion
