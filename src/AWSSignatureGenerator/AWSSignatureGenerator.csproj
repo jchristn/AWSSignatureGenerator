@@ -5,7 +5,7 @@
 		<ApplicationIcon>icon.ico</ApplicationIcon>
 		<GenerateDocumentationFile>True</GenerateDocumentationFile>
 		<DocumentationFile>AWSSignatureGenerator.xml</DocumentationFile>
-		<Version>1.0.7</Version>
+		<Version>1.0.8</Version>
 		<Authors>Joel Christner</Authors>
 		<Description>A simple class library for generating AWS V4 signatures.</Description>
 		<Copyright>(c)2024 Joel Christner</Copyright>

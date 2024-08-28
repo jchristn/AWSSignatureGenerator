@@ -202,6 +202,9 @@
                             key = element.Substring(0, idx);
                         }
 
+                        key = HttpUtility.UrlDecode(key);
+                        val = HttpUtility.UrlDecode(val);
+
                         ret.Add(key, val);
                     }
                 }
@@ -271,6 +274,7 @@
                     }
                 }
 
+                // Console.WriteLine(Environment.NewLine + "AWSSignatureGenerator CanonicalQuerystring: " + Environment.NewLine + ret + Environment.NewLine + "(end)");
                 return ret;
             }
         }
@@ -291,7 +295,7 @@
                         string key = Headers.GetKey(i).ToLower();
                         string val = Headers.Get(key);
                         if (!String.IsNullOrEmpty(val)) val = val.Trim();
-                        
+
                         if (!_HeaderIgnoreList.Contains(key))
                         {
                             ret += key + ":" + val + "\n";
@@ -343,6 +347,8 @@
                 ret += CanonicalHeaders + "\n";
                 ret += string.Join(";", SignedHeaders) + "\n";
                 ret += HashedPayload;
+
+                // Console.WriteLine(Environment.NewLine + "AWSSignatureGenerator CanonicalRequest: " + Environment.NewLine + ret + Environment.NewLine + "(end)");
                 return ret;
             }
         }
@@ -359,6 +365,8 @@
                 ret += Timestamp + "\n";
                 ret += Timestamp.Substring(0, 8) + "/" + Region + "/" + Service + "/aws4_request\n";
                 ret += BytesToHexString(Sha256(Encoding.UTF8.GetBytes(CanonicalRequest))).ToLower();
+
+                // Console.WriteLine(Environment.NewLine + "AWSSignatureGenerator StringToSign: " + Environment.NewLine + ret + Environment.NewLine + "(end)");
                 return ret;
             }
         }
@@ -534,46 +542,6 @@
             "x-amzn-trace-id"
         };
 
-        private static List<string> _QueryElementsToInclude = new List<string>
-        {
-            "accelerate",
-            "acl",
-            "cors",
-            "defaultObjectAcl",
-            "location",
-            "logging",
-            "partNumber",
-            "policy",
-            "requestPayment",
-            "torrent",
-            "versioning",
-            "versionId",
-            "versions",
-            "website",
-            "uploads",
-            "uploadId",
-            "response-content-type",
-            "response-content-language",
-            "response-expires",
-            "response-cache-control",
-            "response-content-disposition",
-            "response-content-encoding",
-            "delete",
-            "lifecycle",
-            "tagging",
-            "restore",
-            "storageClass",
-            "notification",
-            "replication",
-            "requestPayment",
-            "analytics",
-            "metrics",
-            "inventory",
-            "select",
-            "select-type",
-            "object-lock",
-        };
-
         private Stream _RequestBodyStream = null;
         private byte[] _RequestBodyBytes = null;
         private string _RequestBodyString = null;
@@ -603,10 +571,10 @@
         /// <param name="requestBody">Request body (Stream, byte[], or string).</param>
         /// <param name="payloadHashing">Payload hashing method.</param>
         public V4SignatureResult(
-            string timestamp, 
-            string httpMethod, 
-            string fullUrl, 
-            string accessKey, 
+            string timestamp,
+            string httpMethod,
+            string fullUrl,
+            string accessKey,
             string secretKey,
             string region,
             string service,
@@ -713,8 +681,8 @@
             ret += "Request body type    : " + (RequestBodyType == null ? "null" : RequestBodyType.ToString()) + Environment.NewLine;
             ret += "Canonical URI        : " + CanonicalUri + Environment.NewLine;
             ret += "Canonical query      : " + CanonicalQuerystring + Environment.NewLine;
-            ret += "Canonical headers    : " 
-                + Environment.NewLine 
+            ret += "Canonical headers    : "
+                + Environment.NewLine
                 + "[start]" + CanonicalHeaders + "[end]" + Environment.NewLine;
             ret += "Signed headers       : " + Environment.NewLine;
 
@@ -732,10 +700,10 @@
 
             ret += "Keys                 : "
                 + Environment.NewLine
-                +  "| Date key           : " + DateKey + Environment.NewLine
-                +  "| Region key         : " + RegionKey + Environment.NewLine
-                +  "| Service key        : " + ServiceKey + Environment.NewLine
-                +  "| Signing key        : " + SigningKey + Environment.NewLine;
+                + "| Date key           : " + DateKey + Environment.NewLine
+                + "| Region key         : " + RegionKey + Environment.NewLine
+                + "| Service key        : " + ServiceKey + Environment.NewLine
+                + "| Signing key        : " + SigningKey + Environment.NewLine;
 
             ret += "Signature            : " + Signature + Environment.NewLine;
             ret += "Authorization header : " + AuthorizationHeader + Environment.NewLine;
@@ -808,7 +776,7 @@
                             break;
                         }
                     }
-                    
+
                     cs.FlushFinalBlock();
                 }
 
@@ -853,14 +821,19 @@
 
         private string UriEncode(string str)
         {
-            /*
-             * Seem to be having issues with querystring parameters that contain "+"
-             * and this URL indicates that "+" should be encoded as "-"
-             * 
-             * https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/CreateSignatureInCSharp.html
-             * 
-             */
-            return Uri.EscapeDataString(str);
+            StringBuilder sb = new StringBuilder();
+            foreach (char c in str)
+            {
+                if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '~' || c == '.')
+                {
+                    sb.Append(c);
+                }
+                else
+                {
+                    sb.Append('%' + ((int)c).ToString("X2"));
+                }
+            }
+            return sb.ToString();
         }
 
         #endregion
