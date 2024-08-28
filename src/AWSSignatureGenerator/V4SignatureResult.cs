@@ -243,12 +243,14 @@
 
                 if (QueryElements != null && QueryElements.AllKeys.Count() > 0)
                 {
+                    NameValueCollection sorted = SortNameValueCollection(QueryElements);
+
                     int added = 0;
 
-                    for (int i = 0; i < QueryElements.AllKeys.Count(); i++)
+                    for (int i = 0; i < sorted.AllKeys.Count(); i++)
                     {
-                        string key = Uri.EscapeDataString(QueryElements.GetKey(i));
-                        string[] vals = QueryElements.GetValues(i);
+                        string key = Uri.EscapeDataString(sorted.GetKey(i));
+                        string[] vals = sorted.GetValues(i);
 
                         if (vals == null || vals.Length < 1)
                         {
@@ -631,9 +633,7 @@
             PayloadHash = payloadHashing;
 
             if (headers != null && !headers.AllKeys.Contains("host"))
-            {
                 throw new ArgumentException("Supplied headers does not include 'host' header.");
-            }
 
             if (requestBody != null)
             {
@@ -849,7 +849,6 @@
         {
             // NOT supported in netstandard2.1!
             // return Convert.ToHexString(bytes);  
-
             return BitConverter.ToString(bytes).Replace("-", "");
         }
 
