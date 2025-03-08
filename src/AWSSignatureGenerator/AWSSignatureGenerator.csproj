@@ -1,14 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>netstandard2.1;net6.0;net7.0;net8.0</TargetFrameworks>
+		<TargetFrameworks>netstandard2.0;netstandard2.1;net6.0;net7.0;net8.0</TargetFrameworks>
 		<ApplicationIcon>icon.ico</ApplicationIcon>
 		<GenerateDocumentationFile>True</GenerateDocumentationFile>
 		<DocumentationFile>AWSSignatureGenerator.xml</DocumentationFile>
-		<Version>1.0.8</Version>
+		<Version>1.0.9</Version>
 		<Authors>Joel Christner</Authors>
 		<Description>A simple class library for generating AWS V4 signatures.</Description>
-		<Copyright>(c)2024 Joel Christner</Copyright>
+		<Copyright>(c)2025 Joel Christner</Copyright>
 		<PackageProjectUrl>https://github.com/jchristn/AWSSignatureGenerator</PackageProjectUrl>
 		<PackageIcon>icon.png</PackageIcon>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
