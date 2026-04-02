@@ -4,6 +4,144 @@
         <name>AWSSignatureGenerator</name>
     </assembly>
     <members>
+        <member name="T:AWSSignatureGenerator.AwsChunkedStreamReader">
+             <summary>
+             Reads an aws-chunked encoded stream and yields individual chunks with their signatures.
+            
+             Wire format:
+             <code>
+             &lt;hex-size&gt;;chunk-signature=&lt;signature&gt;\r\n
+             &lt;chunk-data&gt;\r\n
+             ...
+             0;chunk-signature=&lt;signature&gt;\r\n
+             \r\n
+             [optional trailing headers]\r\n
+             \r\n
+             0;chunk-signature=&lt;trailer-signature&gt;\r\n
+             \r\n
+             </code>
+             </summary>
+        </member>
+        <member name="M:AWSSignatureGenerator.AwsChunkedStreamReader.#ctor(System.IO.Stream)">
+            <summary>
+            Instantiate.
+            </summary>
+            <param name="stream">Input stream containing aws-chunked encoded data.</param>
+        </member>
+        <member name="M:AWSSignatureGenerator.AwsChunkedStreamReader.ReadNextChunkAsync(System.Threading.CancellationToken)">
+            <summary>
+            Read the next chunk from the stream.
+            After the final data chunk is returned (IsFinal = true), call again to read
+            trailing headers and trailer signature if present.
+            Returns null when there is nothing left to read.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Chunk result with data, signature, and whether this is the final chunk, or null if stream is exhausted.</returns>
+        </member>
+        <member name="M:AWSSignatureGenerator.AwsChunkedStreamReader.Dispose(System.Boolean)">
+            <summary>
+            Dispose.
+            </summary>
+            <param name="disposing">Disposing.</param>
+        </member>
+        <member name="M:AWSSignatureGenerator.AwsChunkedStreamReader.Dispose">
+            <summary>
+            Dispose.
+            </summary>
+        </member>
+        <member name="T:AWSSignatureGenerator.AwsChunkResult">
+            <summary>
+            Represents a single chunk read from an aws-chunked encoded stream.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.AwsChunkResult.Data">
+            <summary>
+            Chunk data bytes. Empty for the final chunk.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.AwsChunkResult.Signature">
+            <summary>
+            Chunk signature from the chunk header.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.AwsChunkResult.IsFinal">
+            <summary>
+            True if this is the final (zero-length) chunk.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.AwsChunkResult.TrailerHeaders">
+            <summary>
+            Trailing headers, if present after the final chunk.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.AwsChunkResult.TrailerSignature">
+            <summary>
+            Trailer signature, if present.
+            </summary>
+        </member>
+        <member name="T:AWSSignatureGenerator.V4ChunkSigner">
+            <summary>
+            Computes and validates AWS V4 streaming (chunked) signatures.
+            Each chunk's signature is chained from the previous signature (or the seed signature for the first chunk).
+            </summary>
+        </member>
+        <member name="M:AWSSignatureGenerator.V4ChunkSigner.#ctor(System.String,System.String,System.String,System.Byte[],System.String)">
+            <summary>
+            Instantiate.
+            </summary>
+            <param name="timestamp">Request timestamp in yyyyMMddTHHmmssZ format.</param>
+            <param name="region">AWS region.</param>
+            <param name="service">AWS service.</param>
+            <param name="signingKey">Derived signing key bytes from V4SignatureResult.SigningKeyBytes.</param>
+            <param name="seedSignature">Seed signature from the Authorization header.</param>
+        </member>
+        <member name="M:AWSSignatureGenerator.V4ChunkSigner.ComputeChunkSignature(System.Byte[])">
+            <summary>
+            Compute the expected signature for the next chunk.
+            Call this for each chunk in order, including the final zero-length chunk.
+            This advances internal state (the previous signature is updated).
+            </summary>
+            <param name="chunkData">Chunk data bytes. Empty or null for the final chunk.</param>
+            <returns>Expected hex signature for this chunk.</returns>
+        </member>
+        <member name="M:AWSSignatureGenerator.V4ChunkSigner.ValidateChunk(System.Byte[],System.String)">
+            <summary>
+            Validate a chunk's signature.
+            This advances internal state (the previous signature is updated on success).
+            </summary>
+            <param name="chunkData">Chunk data bytes. Empty or null for the final chunk.</param>
+            <param name="providedSignature">Signature from the chunk header.</param>
+            <returns>True if signature matches.</returns>
+        </member>
+        <member name="M:AWSSignatureGenerator.V4ChunkSigner.ComputeTrailerSignature(System.Collections.Generic.SortedDictionary{System.String,System.String})">
+            <summary>
+            Compute the expected signature for the trailing headers.
+            Call this after the final zero-length chunk has been processed.
+            This advances internal state.
+            </summary>
+            <param name="trailerHeaders">Trailing headers as key-value pairs, sorted by key.</param>
+            <returns>Expected hex signature for the trailer.</returns>
+        </member>
+        <member name="M:AWSSignatureGenerator.V4ChunkSigner.ValidateTrailer(System.Collections.Generic.SortedDictionary{System.String,System.String},System.String)">
+            <summary>
+            Validate the trailer signature.
+            Call this after the final zero-length chunk has been processed.
+            </summary>
+            <param name="trailerHeaders">Trailing headers as key-value pairs, sorted by key.</param>
+            <param name="providedSignature">Signature from the trailer chunk.</param>
+            <returns>True if signature matches.</returns>
+        </member>
+        <member name="M:AWSSignatureGenerator.V4ChunkSigner.Dispose(System.Boolean)">
+            <summary>
+            Dispose.
+            </summary>
+            <param name="disposing">Disposing.</param>
+        </member>
+        <member name="M:AWSSignatureGenerator.V4ChunkSigner.Dispose">
+            <summary>
+            Dispose.
+            </summary>
+        </member>
         <member name="T:AWSSignatureGenerator.V4PayloadHashEnum">
             <summary>
             V4 payload hash.
@@ -11,17 +149,29 @@
         </member>
         <member name="F:AWSSignatureGenerator.V4PayloadHashEnum.IsStreaming">
             <summary>
-            Streaming payload.
+            Streaming unsigned payload (uses literal "STREAMING-UNSIGNED-PAYLOAD-TRAILER").
             </summary>
         </member>
         <member name="F:AWSSignatureGenerator.V4PayloadHashEnum.Unsigned">
             <summary>
-            Unsigned payload.
+            Unsigned payload (uses literal "UNSIGNED-PAYLOAD").
             </summary>
         </member>
         <member name="F:AWSSignatureGenerator.V4PayloadHashEnum.Signed">
             <summary>
-            Signed payload.
+            Signed payload (computes SHA-256 of request body).
+            </summary>
+        </member>
+        <member name="F:AWSSignatureGenerator.V4PayloadHashEnum.StreamingSigned">
+            <summary>
+            Streaming signed payload without trailers (uses literal "STREAMING-AWS4-HMAC-SHA256-PAYLOAD").
+            Used for AWSSDK 4.x chunked uploads without trailing checksums.
+            </summary>
+        </member>
+        <member name="F:AWSSignatureGenerator.V4PayloadHashEnum.StreamingSignedTrailer">
+            <summary>
+            Streaming signed payload with trailers (uses literal "STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER").
+            Used for AWSSDK 4.x chunked uploads with trailing checksums.
             </summary>
         </member>
         <member name="T:AWSSignatureGenerator.V4SignatureResult">
@@ -177,6 +327,12 @@
         <member name="P:AWSSignatureGenerator.V4SignatureResult.SigningKey">
             <summary>
             Signing key.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V4SignatureResult.SigningKeyBytes">
+            <summary>
+            Signing key as raw bytes.
+            Used by V4ChunkSigner for chunk signature computation.
             </summary>
         </member>
         <member name="P:AWSSignatureGenerator.V4SignatureResult.Signature">

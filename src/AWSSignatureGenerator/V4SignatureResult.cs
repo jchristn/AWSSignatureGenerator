@@ -424,6 +424,14 @@ namespace AWSSignatureGenerator
                 {
                     return _ChecksumStreamingUnsigned;
                 }
+                else if (PayloadHash == V4PayloadHashEnum.StreamingSigned)
+                {
+                    return _ChecksumStreamingSigned;
+                }
+                else if (PayloadHash == V4PayloadHashEnum.StreamingSignedTrailer)
+                {
+                    return _ChecksumStreamingSignedTrailer;
+                }
                 else if (PayloadHash == V4PayloadHashEnum.Signed)
                 {
                     if (_RequestBodyStream != null)
@@ -500,6 +508,18 @@ namespace AWSSignatureGenerator
         }
 
         /// <summary>
+        /// Signing key as raw bytes.
+        /// Used by V4ChunkSigner for chunk signature computation.
+        /// </summary>
+        public byte[] SigningKeyBytes
+        {
+            get
+            {
+                return _SigningKey;
+            }
+        }
+
+        /// <summary>
         /// Signature.
         /// </summary>
         public string Signature
@@ -553,6 +573,8 @@ namespace AWSSignatureGenerator
         private static string _AmazonTimestampFormatCompact = "yyyyMMddTHHmmssZ";
         private static string _ChecksumUnsignedPayload = "UNSIGNED-PAYLOAD";
         private static string _ChecksumStreamingUnsigned = "STREAMING-UNSIGNED-PAYLOAD-TRAILER";
+        private static string _ChecksumStreamingSigned = "STREAMING-AWS4-HMAC-SHA256-PAYLOAD";
+        private static string _ChecksumStreamingSignedTrailer = "STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER";
 
         private static List<string> _HeaderIgnoreList = new List<string>
         {

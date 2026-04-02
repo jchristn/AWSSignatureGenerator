@@ -4,7 +4,9 @@ namespace Test.Shared
     using System.Collections.Generic;
     using System.Collections.Specialized;
     using System.IO;
+    using System.Security.Cryptography;
     using System.Text;
+    using System.Threading.Tasks;
     using AWSSignatureGenerator;
 
     /// <summary>
@@ -1232,6 +1234,609 @@ namespace Test.Shared
 
                             AssertEqual(expectedCanonicalRequest, result.CanonicalRequest, "Canonical Request");
                             AssertEqual("b092397439375d59119072764a1e9a144677c43d9906fd98a5742c57a2855de6", result.Signature, "Signature");
+                        }
+                    }
+                },
+
+                // ================================================================
+                // Streaming signature — new enum values
+                // ================================================================
+                new TestCase
+                {
+                    Name = "HashedPayload_StreamingSigned_ReturnsLiteral",
+                    Description = "StreamingSigned returns 'STREAMING-AWS4-HMAC-SHA256-PAYLOAD'",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection { { "host", "example.com" } };
+                        using (V4SignatureResult result = new V4SignatureResult(
+                            _ExampleTimestamp, "PUT", "http://example.com/", "key", "secret", "us-east-1", "s3", headers,
+                            null, V4PayloadHashEnum.StreamingSigned))
+                        {
+                            AssertEqual("STREAMING-AWS4-HMAC-SHA256-PAYLOAD", result.HashedPayload, "StreamingSigned payload literal");
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "HashedPayload_StreamingSignedTrailer_ReturnsLiteral",
+                    Description = "StreamingSignedTrailer returns 'STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER'",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection { { "host", "example.com" } };
+                        using (V4SignatureResult result = new V4SignatureResult(
+                            _ExampleTimestamp, "PUT", "http://example.com/", "key", "secret", "us-east-1", "s3", headers,
+                            null, V4PayloadHashEnum.StreamingSignedTrailer))
+                        {
+                            AssertEqual("STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER", result.HashedPayload, "StreamingSignedTrailer payload literal");
+                        }
+                    }
+                },
+
+                // ================================================================
+                // Streaming signature — seed signature validation
+                // ================================================================
+                new TestCase
+                {
+                    Name = "StreamingSigned_SeedSignature_Deterministic",
+                    Description = "StreamingSigned seed signature is deterministic and differs from Signed mode",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection
+                        {
+                            { "host", "example.com" },
+                            { "x-amz-date", _ExampleTimestamp },
+                            { "x-amz-content-sha256", "STREAMING-AWS4-HMAC-SHA256-PAYLOAD" }
+                        };
+
+                        using (V4SignatureResult r1 = new V4SignatureResult(
+                            _ExampleTimestamp, "PUT", "http://example.com/bucket/key", _ExampleAccessKey, _ExampleSecretKey,
+                            _ExampleRegion, _ExampleService, headers, null, V4PayloadHashEnum.StreamingSigned))
+                        using (V4SignatureResult r2 = new V4SignatureResult(
+                            _ExampleTimestamp, "PUT", "http://example.com/bucket/key", _ExampleAccessKey, _ExampleSecretKey,
+                            _ExampleRegion, _ExampleService, headers, null, V4PayloadHashEnum.StreamingSigned))
+                        {
+                            AssertEqual(r1.Signature, r2.Signature, "Seed signatures should be deterministic");
+                            AssertEqual(64, r1.Signature.Length, "Signature length");
+                            AssertTrue(IsLowercaseHex(r1.Signature), "Signature should be lowercase hex");
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "StreamingSigned_DiffersFromSigned",
+                    Description = "StreamingSigned seed signature differs from Signed signature for same request",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection
+                        {
+                            { "host", "example.com" },
+                            { "x-amz-date", _ExampleTimestamp }
+                        };
+
+                        using (V4SignatureResult rSigned = new V4SignatureResult(
+                            _ExampleTimestamp, "PUT", "http://example.com/bucket/key", _ExampleAccessKey, _ExampleSecretKey,
+                            _ExampleRegion, _ExampleService, headers, null, V4PayloadHashEnum.Signed))
+                        using (V4SignatureResult rStreaming = new V4SignatureResult(
+                            _ExampleTimestamp, "PUT", "http://example.com/bucket/key", _ExampleAccessKey, _ExampleSecretKey,
+                            _ExampleRegion, _ExampleService, headers, null, V4PayloadHashEnum.StreamingSigned))
+                        {
+                            AssertTrue(rSigned.Signature != rStreaming.Signature,
+                                "StreamingSigned and Signed should produce different signatures");
+                        }
+                    }
+                },
+
+                // ================================================================
+                // SigningKeyBytes
+                // ================================================================
+                new TestCase
+                {
+                    Name = "SigningKeyBytes_NotNull",
+                    Description = "SigningKeyBytes property returns the raw signing key bytes",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection { { "host", "example.com" } };
+                        using (V4SignatureResult result = new V4SignatureResult(
+                            _ExampleTimestamp, "GET", "http://example.com/", _ExampleAccessKey, _ExampleSecretKey,
+                            _ExampleRegion, _ExampleService, headers))
+                        {
+                            AssertNotNull(result.SigningKeyBytes, "SigningKeyBytes");
+                            AssertEqual(32, result.SigningKeyBytes.Length, "SigningKeyBytes length (HMAC-SHA256 = 32 bytes)");
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "SigningKeyBytes_MatchesSigningKeyHex",
+                    Description = "SigningKeyBytes matches the hex-encoded SigningKey property",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection { { "host", "example.com" } };
+                        using (V4SignatureResult result = new V4SignatureResult(
+                            _ExampleTimestamp, "GET", "http://example.com/", _ExampleAccessKey, _ExampleSecretKey,
+                            _ExampleRegion, _ExampleService, headers))
+                        {
+                            string hexFromBytes = BitConverter.ToString(result.SigningKeyBytes).Replace("-", "").ToLower();
+                            AssertEqual(result.SigningKey, hexFromBytes, "SigningKeyBytes should match SigningKey hex");
+                        }
+                    }
+                },
+
+                // ================================================================
+                // V4ChunkSigner — chunk signature computation
+                // ================================================================
+                new TestCase
+                {
+                    Name = "ChunkSigner_ComputeChunkSignature_Deterministic",
+                    Description = "ChunkSigner produces deterministic signatures for the same input",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection
+                        {
+                            { "host", "example.com" },
+                            { "x-amz-date", _ExampleTimestamp },
+                            { "x-amz-content-sha256", "STREAMING-AWS4-HMAC-SHA256-PAYLOAD" }
+                        };
+
+                        using (V4SignatureResult result = new V4SignatureResult(
+                            _ExampleTimestamp, "PUT", "http://example.com/bucket/key", _ExampleAccessKey, _ExampleSecretKey,
+                            _ExampleRegion, _ExampleService, headers, null, V4PayloadHashEnum.StreamingSigned))
+                        {
+                            byte[] chunkData = Encoding.UTF8.GetBytes("Hello");
+
+                            using (V4ChunkSigner signer1 = new V4ChunkSigner(
+                                _ExampleTimestamp, _ExampleRegion, _ExampleService,
+                                result.SigningKeyBytes, result.Signature))
+                            using (V4ChunkSigner signer2 = new V4ChunkSigner(
+                                _ExampleTimestamp, _ExampleRegion, _ExampleService,
+                                result.SigningKeyBytes, result.Signature))
+                            {
+                                string sig1 = signer1.ComputeChunkSignature(chunkData);
+                                string sig2 = signer2.ComputeChunkSignature(chunkData);
+                                AssertEqual(sig1, sig2, "Chunk signatures should be deterministic");
+                                AssertEqual(64, sig1.Length, "Chunk signature length");
+                                AssertTrue(IsLowercaseHex(sig1), "Chunk signature should be lowercase hex");
+                            }
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "ChunkSigner_ChainedSignatures_Differ",
+                    Description = "Successive chunk signatures differ because each chains from the previous",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection
+                        {
+                            { "host", "example.com" },
+                            { "x-amz-date", _ExampleTimestamp },
+                            { "x-amz-content-sha256", "STREAMING-AWS4-HMAC-SHA256-PAYLOAD" }
+                        };
+
+                        using (V4SignatureResult result = new V4SignatureResult(
+                            _ExampleTimestamp, "PUT", "http://example.com/bucket/key", _ExampleAccessKey, _ExampleSecretKey,
+                            _ExampleRegion, _ExampleService, headers, null, V4PayloadHashEnum.StreamingSigned))
+                        using (V4ChunkSigner signer = new V4ChunkSigner(
+                            _ExampleTimestamp, _ExampleRegion, _ExampleService,
+                            result.SigningKeyBytes, result.Signature))
+                        {
+                            string sig1 = signer.ComputeChunkSignature(Encoding.UTF8.GetBytes("chunk1"));
+                            string sig2 = signer.ComputeChunkSignature(Encoding.UTF8.GetBytes("chunk2"));
+                            string sigFinal = signer.ComputeChunkSignature(null);
+
+                            AssertTrue(sig1 != sig2, "Different chunks should produce different signatures");
+                            AssertTrue(sig2 != sigFinal, "Final chunk should produce a different signature");
+                            AssertTrue(sig1 != sigFinal, "First and final chunk signatures should differ");
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "ChunkSigner_ValidateChunk_Success",
+                    Description = "ValidateChunk returns true for a correct signature",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection
+                        {
+                            { "host", "example.com" },
+                            { "x-amz-date", _ExampleTimestamp },
+                            { "x-amz-content-sha256", "STREAMING-AWS4-HMAC-SHA256-PAYLOAD" }
+                        };
+
+                        using (V4SignatureResult result = new V4SignatureResult(
+                            _ExampleTimestamp, "PUT", "http://example.com/bucket/key", _ExampleAccessKey, _ExampleSecretKey,
+                            _ExampleRegion, _ExampleService, headers, null, V4PayloadHashEnum.StreamingSigned))
+                        {
+                            byte[] chunkData = Encoding.UTF8.GetBytes("Hello");
+
+                            // Compute the expected signature
+                            string expectedSig;
+                            using (V4ChunkSigner computeSigner = new V4ChunkSigner(
+                                _ExampleTimestamp, _ExampleRegion, _ExampleService,
+                                result.SigningKeyBytes, result.Signature))
+                            {
+                                expectedSig = computeSigner.ComputeChunkSignature(chunkData);
+                            }
+
+                            // Validate using a fresh signer
+                            using (V4ChunkSigner validateSigner = new V4ChunkSigner(
+                                _ExampleTimestamp, _ExampleRegion, _ExampleService,
+                                result.SigningKeyBytes, result.Signature))
+                            {
+                                AssertTrue(validateSigner.ValidateChunk(chunkData, expectedSig), "ValidateChunk should return true for correct signature");
+                            }
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "ChunkSigner_ValidateChunk_Failure",
+                    Description = "ValidateChunk returns false for an incorrect signature",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection
+                        {
+                            { "host", "example.com" },
+                            { "x-amz-date", _ExampleTimestamp },
+                            { "x-amz-content-sha256", "STREAMING-AWS4-HMAC-SHA256-PAYLOAD" }
+                        };
+
+                        using (V4SignatureResult result = new V4SignatureResult(
+                            _ExampleTimestamp, "PUT", "http://example.com/bucket/key", _ExampleAccessKey, _ExampleSecretKey,
+                            _ExampleRegion, _ExampleService, headers, null, V4PayloadHashEnum.StreamingSigned))
+                        using (V4ChunkSigner signer = new V4ChunkSigner(
+                            _ExampleTimestamp, _ExampleRegion, _ExampleService,
+                            result.SigningKeyBytes, result.Signature))
+                        {
+                            AssertTrue(!signer.ValidateChunk(Encoding.UTF8.GetBytes("Hello"), "0000000000000000000000000000000000000000000000000000000000000000"),
+                                "ValidateChunk should return false for wrong signature");
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "ChunkSigner_FinalChunk_EmptyData",
+                    Description = "Final chunk with null/empty data produces a valid signature",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection
+                        {
+                            { "host", "example.com" },
+                            { "x-amz-date", _ExampleTimestamp },
+                            { "x-amz-content-sha256", "STREAMING-AWS4-HMAC-SHA256-PAYLOAD" }
+                        };
+
+                        using (V4SignatureResult result = new V4SignatureResult(
+                            _ExampleTimestamp, "PUT", "http://example.com/bucket/key", _ExampleAccessKey, _ExampleSecretKey,
+                            _ExampleRegion, _ExampleService, headers, null, V4PayloadHashEnum.StreamingSigned))
+                        using (V4ChunkSigner signer1 = new V4ChunkSigner(
+                            _ExampleTimestamp, _ExampleRegion, _ExampleService,
+                            result.SigningKeyBytes, result.Signature))
+                        using (V4ChunkSigner signer2 = new V4ChunkSigner(
+                            _ExampleTimestamp, _ExampleRegion, _ExampleService,
+                            result.SigningKeyBytes, result.Signature))
+                        {
+                            string sigNull = signer1.ComputeChunkSignature(null);
+                            string sigEmpty = signer2.ComputeChunkSignature(Array.Empty<byte>());
+                            AssertEqual(sigNull, sigEmpty, "Null and empty data should produce identical final chunk signatures");
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "ChunkSigner_Constructor_NullArgs_Throw",
+                    Description = "V4ChunkSigner constructor throws on null arguments",
+                    TestAction = () =>
+                    {
+                        byte[] dummyKey = new byte[32];
+                        AssertThrows<ArgumentNullException>(() => new V4ChunkSigner(null, "us-east-1", "s3", dummyKey, "seed"));
+                        AssertThrows<ArgumentNullException>(() => new V4ChunkSigner("20150830T123600Z", null, "s3", dummyKey, "seed"));
+                        AssertThrows<ArgumentNullException>(() => new V4ChunkSigner("20150830T123600Z", "us-east-1", null, dummyKey, "seed"));
+                        AssertThrows<ArgumentNullException>(() => new V4ChunkSigner("20150830T123600Z", "us-east-1", "s3", null, "seed"));
+                        AssertThrows<ArgumentNullException>(() => new V4ChunkSigner("20150830T123600Z", "us-east-1", "s3", dummyKey, null));
+                    }
+                },
+
+                // ================================================================
+                // V4ChunkSigner — trailer signature
+                // ================================================================
+                new TestCase
+                {
+                    Name = "ChunkSigner_TrailerSignature_Deterministic",
+                    Description = "Trailer signature is deterministic",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection
+                        {
+                            { "host", "example.com" },
+                            { "x-amz-date", _ExampleTimestamp },
+                            { "x-amz-content-sha256", "STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER" }
+                        };
+
+                        using (V4SignatureResult result = new V4SignatureResult(
+                            _ExampleTimestamp, "PUT", "http://example.com/bucket/key", _ExampleAccessKey, _ExampleSecretKey,
+                            _ExampleRegion, _ExampleService, headers, null, V4PayloadHashEnum.StreamingSignedTrailer))
+                        {
+                            SortedDictionary<string, string> trailers = new SortedDictionary<string, string>
+                            {
+                                { "x-amz-checksum-crc32", "aBC123==" }
+                            };
+
+                            string sig1, sig2;
+                            using (V4ChunkSigner signer1 = new V4ChunkSigner(
+                                _ExampleTimestamp, _ExampleRegion, _ExampleService,
+                                result.SigningKeyBytes, result.Signature))
+                            {
+                                signer1.ComputeChunkSignature(Encoding.UTF8.GetBytes("Hello"));
+                                signer1.ComputeChunkSignature(null); // final
+                                sig1 = signer1.ComputeTrailerSignature(trailers);
+                            }
+
+                            using (V4ChunkSigner signer2 = new V4ChunkSigner(
+                                _ExampleTimestamp, _ExampleRegion, _ExampleService,
+                                result.SigningKeyBytes, result.Signature))
+                            {
+                                signer2.ComputeChunkSignature(Encoding.UTF8.GetBytes("Hello"));
+                                signer2.ComputeChunkSignature(null); // final
+                                sig2 = signer2.ComputeTrailerSignature(trailers);
+                            }
+
+                            AssertEqual(sig1, sig2, "Trailer signatures should be deterministic");
+                            AssertEqual(64, sig1.Length, "Trailer signature length");
+                            AssertTrue(IsLowercaseHex(sig1), "Trailer signature should be lowercase hex");
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "ChunkSigner_ValidateTrailer_Success",
+                    Description = "ValidateTrailer returns true for a correct trailer signature",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection
+                        {
+                            { "host", "example.com" },
+                            { "x-amz-date", _ExampleTimestamp },
+                            { "x-amz-content-sha256", "STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER" }
+                        };
+
+                        using (V4SignatureResult result = new V4SignatureResult(
+                            _ExampleTimestamp, "PUT", "http://example.com/bucket/key", _ExampleAccessKey, _ExampleSecretKey,
+                            _ExampleRegion, _ExampleService, headers, null, V4PayloadHashEnum.StreamingSignedTrailer))
+                        {
+                            SortedDictionary<string, string> trailers = new SortedDictionary<string, string>
+                            {
+                                { "x-amz-checksum-crc32", "aBC123==" }
+                            };
+
+                            string expectedSig;
+                            using (V4ChunkSigner computeSigner = new V4ChunkSigner(
+                                _ExampleTimestamp, _ExampleRegion, _ExampleService,
+                                result.SigningKeyBytes, result.Signature))
+                            {
+                                computeSigner.ComputeChunkSignature(null); // final chunk
+                                expectedSig = computeSigner.ComputeTrailerSignature(trailers);
+                            }
+
+                            using (V4ChunkSigner validateSigner = new V4ChunkSigner(
+                                _ExampleTimestamp, _ExampleRegion, _ExampleService,
+                                result.SigningKeyBytes, result.Signature))
+                            {
+                                validateSigner.ComputeChunkSignature(null); // final chunk
+                                AssertTrue(validateSigner.ValidateTrailer(trailers, expectedSig),
+                                    "ValidateTrailer should return true for correct signature");
+                            }
+                        }
+                    }
+                },
+
+                // ================================================================
+                // AwsChunkedStreamReader
+                // ================================================================
+                new TestCase
+                {
+                    Name = "AwsChunkedStreamReader_SingleChunk",
+                    Description = "Reads a single data chunk and final chunk from aws-chunked stream",
+                    TestAction = () =>
+                    {
+                        string wire =
+                            "5;chunk-signature=aaaa\r\n" +
+                            "Hello\r\n" +
+                            "0;chunk-signature=bbbb\r\n" +
+                            "\r\n";
+
+                        using (MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(wire)))
+                        using (AwsChunkedStreamReader reader = new AwsChunkedStreamReader(ms))
+                        {
+                            AwsChunkResult chunk1 = reader.ReadNextChunkAsync().GetAwaiter().GetResult();
+                            AssertNotNull(chunk1, "chunk1");
+                            AssertEqual(false, chunk1.IsFinal, "chunk1 should not be final");
+                            AssertEqual("Hello", Encoding.UTF8.GetString(chunk1.Data), "chunk1 data");
+                            AssertEqual("aaaa", chunk1.Signature, "chunk1 signature");
+
+                            AwsChunkResult chunk2 = reader.ReadNextChunkAsync().GetAwaiter().GetResult();
+                            AssertNotNull(chunk2, "chunk2");
+                            AssertEqual(true, chunk2.IsFinal, "chunk2 should be final");
+                            AssertEqual(0, chunk2.Data.Length, "Final chunk should have empty data");
+                            AssertEqual("bbbb", chunk2.Signature, "chunk2 signature");
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "AwsChunkedStreamReader_MultipleChunks",
+                    Description = "Reads multiple data chunks from aws-chunked stream",
+                    TestAction = () =>
+                    {
+                        string wire =
+                            "5;chunk-signature=sig1\r\n" +
+                            "Hello\r\n" +
+                            "6;chunk-signature=sig2\r\n" +
+                            " World\r\n" +
+                            "0;chunk-signature=sig3\r\n" +
+                            "\r\n";
+
+                        using (MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(wire)))
+                        using (AwsChunkedStreamReader reader = new AwsChunkedStreamReader(ms))
+                        {
+                            AwsChunkResult c1 = reader.ReadNextChunkAsync().GetAwaiter().GetResult();
+                            AssertEqual("Hello", Encoding.UTF8.GetString(c1.Data), "chunk1 data");
+                            AssertEqual("sig1", c1.Signature, "chunk1 sig");
+                            AssertEqual(false, c1.IsFinal, "chunk1 not final");
+
+                            AwsChunkResult c2 = reader.ReadNextChunkAsync().GetAwaiter().GetResult();
+                            AssertEqual(" World", Encoding.UTF8.GetString(c2.Data), "chunk2 data");
+                            AssertEqual("sig2", c2.Signature, "chunk2 sig");
+                            AssertEqual(false, c2.IsFinal, "chunk2 not final");
+
+                            AwsChunkResult c3 = reader.ReadNextChunkAsync().GetAwaiter().GetResult();
+                            AssertEqual(true, c3.IsFinal, "chunk3 final");
+                            AssertEqual("sig3", c3.Signature, "chunk3 sig");
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "AwsChunkedStreamReader_WithTrailers",
+                    Description = "Reads trailing headers and trailer signature from aws-chunked stream",
+                    TestAction = () =>
+                    {
+                        string wire =
+                            "5;chunk-signature=sig1\r\n" +
+                            "Hello\r\n" +
+                            "0;chunk-signature=sig2\r\n" +
+                            "\r\n" +
+                            "x-amz-checksum-crc32:aBC123==\r\n" +
+                            "\r\n" +
+                            "0;chunk-signature=trailersig\r\n" +
+                            "\r\n";
+
+                        using (MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(wire)))
+                        using (AwsChunkedStreamReader reader = new AwsChunkedStreamReader(ms))
+                        {
+                            AwsChunkResult c1 = reader.ReadNextChunkAsync().GetAwaiter().GetResult();
+                            AssertEqual("Hello", Encoding.UTF8.GetString(c1.Data), "chunk data");
+
+                            AwsChunkResult c2 = reader.ReadNextChunkAsync().GetAwaiter().GetResult();
+                            AssertEqual(true, c2.IsFinal, "final chunk");
+
+                            AwsChunkResult trailer = reader.ReadNextChunkAsync().GetAwaiter().GetResult();
+                            AssertNotNull(trailer, "trailer result");
+                            AssertNotNull(trailer.TrailerHeaders, "TrailerHeaders");
+                            AssertEqual("aBC123==", trailer.TrailerHeaders["x-amz-checksum-crc32"], "Trailer header value");
+                            AssertEqual("trailersig", trailer.TrailerSignature, "Trailer signature");
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "AwsChunkedStreamReader_Constructor_NullStream_Throws",
+                    Description = "AwsChunkedStreamReader throws on null stream",
+                    TestAction = () =>
+                    {
+                        AssertThrows<ArgumentNullException>(() => new AwsChunkedStreamReader(null));
+                    }
+                },
+
+                // ================================================================
+                // End-to-end: seed + chunk + trailer validation
+                // ================================================================
+                new TestCase
+                {
+                    Name = "EndToEnd_StreamingSignature_ChunkValidation",
+                    Description = "End-to-end: compute seed signature, then validate chunk signatures produced by same key",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection
+                        {
+                            { "host", "s3.amazonaws.com" },
+                            { "x-amz-date", "20130524T000000Z" },
+                            { "x-amz-content-sha256", "STREAMING-AWS4-HMAC-SHA256-PAYLOAD" },
+                            { "x-amz-decoded-content-length", "11" },
+                            { "content-encoding", "aws-chunked" }
+                        };
+
+                        using (V4SignatureResult seedResult = new V4SignatureResult(
+                            "20130524T000000Z", "PUT", "https://s3.amazonaws.com/mybucket/mykey",
+                            _AwsAccessKey, _AwsSecretKey, "us-east-1", "s3",
+                            headers, null, V4PayloadHashEnum.StreamingSigned))
+                        {
+                            string seedSig = seedResult.Signature;
+                            AssertEqual(64, seedSig.Length, "Seed signature length");
+
+                            // Simulate two chunks: "Hello" and " World", then final
+                            byte[] chunk1 = Encoding.UTF8.GetBytes("Hello");
+                            byte[] chunk2 = Encoding.UTF8.GetBytes(" World");
+
+                            // Compute expected signatures
+                            string expectedSig1, expectedSig2, expectedFinal;
+                            using (V4ChunkSigner computeSigner = new V4ChunkSigner(
+                                "20130524T000000Z", "us-east-1", "s3",
+                                seedResult.SigningKeyBytes, seedSig))
+                            {
+                                expectedSig1 = computeSigner.ComputeChunkSignature(chunk1);
+                                expectedSig2 = computeSigner.ComputeChunkSignature(chunk2);
+                                expectedFinal = computeSigner.ComputeChunkSignature(null);
+                            }
+
+                            // Validate using a fresh signer
+                            using (V4ChunkSigner validateSigner = new V4ChunkSigner(
+                                "20130524T000000Z", "us-east-1", "s3",
+                                seedResult.SigningKeyBytes, seedSig))
+                            {
+                                AssertTrue(validateSigner.ValidateChunk(chunk1, expectedSig1), "Chunk 1 validation");
+                                AssertTrue(validateSigner.ValidateChunk(chunk2, expectedSig2), "Chunk 2 validation");
+                                AssertTrue(validateSigner.ValidateChunk(null, expectedFinal), "Final chunk validation");
+                            }
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "EndToEnd_StreamingSignatureTrailer_FullFlow",
+                    Description = "End-to-end: seed + chunks + trailer validation with StreamingSignedTrailer mode",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection
+                        {
+                            { "host", "s3.amazonaws.com" },
+                            { "x-amz-date", "20130524T000000Z" },
+                            { "x-amz-content-sha256", "STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER" },
+                            { "x-amz-decoded-content-length", "5" },
+                            { "x-amz-trailer", "x-amz-checksum-crc32" },
+                            { "content-encoding", "aws-chunked" }
+                        };
+
+                        using (V4SignatureResult seedResult = new V4SignatureResult(
+                            "20130524T000000Z", "PUT", "https://s3.amazonaws.com/mybucket/mykey",
+                            _AwsAccessKey, _AwsSecretKey, "us-east-1", "s3",
+                            headers, null, V4PayloadHashEnum.StreamingSignedTrailer))
+                        {
+                            SortedDictionary<string, string> trailers = new SortedDictionary<string, string>
+                            {
+                                { "x-amz-checksum-crc32", "aBC123==" }
+                            };
+
+                            // Compute all expected signatures
+                            string chunkSig, finalSig, trailerSig;
+                            using (V4ChunkSigner computeSigner = new V4ChunkSigner(
+                                "20130524T000000Z", "us-east-1", "s3",
+                                seedResult.SigningKeyBytes, seedResult.Signature))
+                            {
+                                chunkSig = computeSigner.ComputeChunkSignature(Encoding.UTF8.GetBytes("Hello"));
+                                finalSig = computeSigner.ComputeChunkSignature(null);
+                                trailerSig = computeSigner.ComputeTrailerSignature(trailers);
+                            }
+
+                            // Validate
+                            using (V4ChunkSigner validateSigner = new V4ChunkSigner(
+                                "20130524T000000Z", "us-east-1", "s3",
+                                seedResult.SigningKeyBytes, seedResult.Signature))
+                            {
+                                AssertTrue(validateSigner.ValidateChunk(Encoding.UTF8.GetBytes("Hello"), chunkSig), "Chunk validation");
+                                AssertTrue(validateSigner.ValidateChunk(null, finalSig), "Final chunk validation");
+                                AssertTrue(validateSigner.ValidateTrailer(trailers, trailerSig), "Trailer validation");
+                            }
                         }
                     }
                 },
