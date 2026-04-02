@@ -1,4 +1,4 @@
-﻿namespace AWSSignatureGenerator
+namespace AWSSignatureGenerator
 {
     using System;
     using System.Collections.Generic;
@@ -17,18 +17,18 @@
     {
         /*
          * Helpful reference links
-         * 
+         *
          * https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
          * https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html
          * https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_aws-signing.html
          * https://docs.aws.amazon.com/IAM/latest/UserGuide/create-signed-request.html
-         * 
+         *
          * Helpful source links
-         * 
+         *
          * https://github.com/boto/botocore/blob/develop/botocore/auth.py
          * https://www.aloneguid.uk/posts/2021/02/aws-s3-auth-raw/
          * https://gist.github.com/yvanin/0bdf68c1139ad698519e
-         * 
+         *
          */
 
         #region Public-Members
@@ -149,17 +149,7 @@
         {
             get
             {
-                string ret = _Uri.PathAndQuery;
-                if (!String.IsNullOrEmpty(ret))
-                {
-                    if (!ret.StartsWith("/")) ret = "/" + ret;
-                    if (ret.Contains("?"))
-                    {
-                        int idx = ret.IndexOf("?");
-                        ret = ret.Substring(0, idx);
-                    }
-                }
-                return ret;
+                return _RawPath;
             }
         }
 
@@ -170,7 +160,7 @@
         {
             get
             {
-                return _Uri.Query;
+                return _RawQuerystring;
             }
         }
 
@@ -181,12 +171,12 @@
         {
             get
             {
-                NameValueCollection ret = new NameValueCollection(StringComparer.InvariantCultureIgnoreCase);
+                NameValueCollection ret = new NameValueCollection(StringComparer.Ordinal);
 
                 if (!String.IsNullOrEmpty(Querystring))
                 {
                     string query = Querystring;
-                    query = query.Replace("?", "");
+                    query = query.TrimStart('?');
 
                     string[] elements = query.Split('&');
 
@@ -231,7 +221,7 @@
         {
             get
             {
-                return Path;
+                return UriEncode(HttpUtility.UrlDecode(Path), false);
             }
         }
 
@@ -242,40 +232,49 @@
         {
             get
             {
-                string ret = "";
+                string rawQuery = Querystring;
+                if (String.IsNullOrEmpty(rawQuery)) return "";
 
-                if (QueryElements != null && QueryElements.AllKeys.Count() > 0)
+                rawQuery = rawQuery.TrimStart('?');
+                if (String.IsNullOrEmpty(rawQuery)) return "";
+
+                string[] elements = rawQuery.Split('&');
+                List<KeyValuePair<string, string>> encodedPairs = new List<KeyValuePair<string, string>>();
+
+                foreach (string element in elements)
                 {
-                    NameValueCollection sorted = SortNameValueCollection(QueryElements);
+                    string rawKey = element;
+                    string rawVal = "";
 
-                    int added = 0;
-
-                    for (int i = 0; i < sorted.AllKeys.Count(); i++)
+                    if (element.Contains("="))
                     {
-                        string key = UriEncode(sorted.GetKey(i));
-                        string[] vals = sorted.GetValues(i);
-
-                        if (vals == null || vals.Length < 1)
-                        {
-                            if (added > 0) ret += "&";
-                            ret += key + "=";
-                            added++;
-                        }
-                        else
-                        {
-                            foreach (string val in vals)
-                            {
-                                if (added > 0) ret += "&";
-                                ret += key + "=";
-                                if (!String.IsNullOrEmpty(val)) ret += UriEncode(val);
-                                added++;
-                            }
-                        }
+                        int idx = element.IndexOf("=");
+                        rawVal = element.Substring(idx + 1);
+                        rawKey = element.Substring(0, idx);
                     }
+
+                    string encodedKey = UriEncode(HttpUtility.UrlDecode(rawKey));
+                    string encodedVal = UriEncode(HttpUtility.UrlDecode(rawVal));
+                    encodedPairs.Add(new KeyValuePair<string, string>(encodedKey, encodedVal));
                 }
 
-                // Console.WriteLine(Environment.NewLine + "AWSSignatureGenerator CanonicalQuerystring: " + Environment.NewLine + ret + Environment.NewLine + "(end)");
-                return ret;
+                encodedPairs.Sort((a, b) =>
+                {
+                    int cmp = String.Compare(a.Key, b.Key, StringComparison.Ordinal);
+                    if (cmp != 0) return cmp;
+                    return String.Compare(a.Value, b.Value, StringComparison.Ordinal);
+                });
+
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < encodedPairs.Count; i++)
+                {
+                    if (i > 0) sb.Append("&");
+                    sb.Append(encodedPairs[i].Key);
+                    sb.Append("=");
+                    sb.Append(encodedPairs[i].Value);
+                }
+
+                return sb.ToString();
             }
         }
 
@@ -286,24 +285,39 @@
         {
             get
             {
-                string ret = "";
+                if (Headers == null || Headers.Count == 0) return "";
 
-                if (Headers != null && Headers.AllKeys.Count() > 0)
+                List<KeyValuePair<string, string>> headerPairs = new List<KeyValuePair<string, string>>();
+
+                for (int i = 0; i < Headers.Count; i++)
                 {
-                    for (int i = 0; i < Headers.AllKeys.Count(); i++)
-                    {
-                        string key = Headers.GetKey(i).ToLower();
-                        string val = Headers.Get(key);
-                        if (!String.IsNullOrEmpty(val)) val = val.Trim();
+                    string key = Headers.GetKey(i).ToLower();
+                    string val = Headers.Get(Headers.GetKey(i));
 
-                        if (!_HeaderIgnoreList.Contains(key))
-                        {
-                            ret += key + ":" + val + "\n";
-                        }
+                    if (!String.IsNullOrEmpty(val))
+                    {
+                        val = val.Trim();
+                        while (val.Contains("  ")) val = val.Replace("  ", " ");
+                    }
+
+                    if (!_HeaderIgnoreList.Contains(key))
+                    {
+                        headerPairs.Add(new KeyValuePair<string, string>(key, val));
                     }
                 }
 
-                return ret;
+                headerPairs.Sort((a, b) => String.Compare(a.Key, b.Key, StringComparison.Ordinal));
+
+                StringBuilder sb = new StringBuilder();
+                foreach (KeyValuePair<string, string> pair in headerPairs)
+                {
+                    sb.Append(pair.Key);
+                    sb.Append(":");
+                    sb.Append(pair.Value);
+                    sb.Append("\n");
+                }
+
+                return sb.ToString();
             }
         }
 
@@ -316,9 +330,9 @@
             {
                 List<string> ret = new List<string>();
 
-                if (Headers != null && Headers.AllKeys.Count() > 0)
+                if (Headers != null && Headers.Count > 0)
                 {
-                    for (int i = 0; i < Headers.AllKeys.Count(); i++)
+                    for (int i = 0; i < Headers.Count; i++)
                     {
                         string key = Headers.GetKey(i).ToLower();
 
@@ -329,6 +343,7 @@
                     }
                 }
 
+                ret.Sort(StringComparer.Ordinal);
                 return ret;
             }
         }
@@ -382,8 +397,10 @@
             }
             set
             {
-                if (value == null) _Headers = new NameValueCollection(StringComparer.InvariantCultureIgnoreCase);
-                _Headers = SortNameValueCollection(value);
+                if (value == null)
+                    _Headers = new NameValueCollection(StringComparer.InvariantCultureIgnoreCase);
+                else
+                    _Headers = SortNameValueCollection(value);
             }
         }
 
@@ -528,6 +545,8 @@
         private string _HttpMethod = "GET";
         private string _FullUrl = null;
         private Uri _Uri;
+        private string _RawPath = "/";
+        private string _RawQuerystring = "";
         private NameValueCollection _Headers = new NameValueCollection(StringComparer.InvariantCultureIgnoreCase);
 
         private static string _EmptySha256Hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
@@ -537,7 +556,15 @@
 
         private static List<string> _HeaderIgnoreList = new List<string>
         {
+            "connection",
             "expect",
+            "keep-alive",
+            "proxy-authenticate",
+            "proxy-authorization",
+            "te",
+            "trailer",
+            "transfer-encoding",
+            "upgrade",
             "user-agent",
             "x-amzn-trace-id"
         };
@@ -600,22 +627,24 @@
             Service = service;
             PayloadHash = payloadHashing;
 
-            if (headers != null && !headers.AllKeys.Contains("host"))
+            if (headers != null && !headers.AllKeys.Any(k => string.Equals(k, "host", StringComparison.OrdinalIgnoreCase)))
                 throw new ArgumentException("Supplied headers does not include 'host' header.");
 
             if (requestBody != null)
             {
                 RequestBodyType = requestBody.GetType();
 
-                if (RequestBodyType == typeof(byte[])) _RequestBodyBytes = requestBody as byte[];
-                else if (RequestBodyType == typeof(Stream)) _RequestBodyStream = requestBody as MemoryStream;
-                else if (RequestBodyType == typeof(string)) _RequestBodyString = requestBody as string;
+                if (requestBody is byte[] bytes) _RequestBodyBytes = bytes;
+                else if (requestBody is Stream stream) _RequestBodyStream = stream;
+                else if (requestBody is string str) _RequestBodyString = str;
                 else throw new ArgumentException("Request body must be of type stream, string, or byte array.");
             }
 
             _HttpMethod = httpMethod.ToUpper();
             _FullUrl = fullUrl;
             _Uri = new Uri(_FullUrl);
+
+            ParseRawPathAndQuerystring(_FullUrl);
 
             _DateKey = HmacSha256(
                 Encoding.UTF8.GetBytes("AWS4" + SecretKey),
@@ -720,11 +749,16 @@
             {
                 if (disposing)
                 {
-                    // TODO: dispose managed state (managed objects)
+                    if (_RequestBodyStream != null)
+                    {
+                        _RequestBodyStream.Dispose();
+                        _RequestBodyStream = null;
+                    }
+
+                    _RequestBodyBytes = null;
+                    _RequestBodyString = null;
                 }
 
-                // TODO: free unmanaged resources (unmanaged objects) and override finalizer
-                // TODO: set large fields to null
                 _Disposed = true;
             }
         }
@@ -743,6 +777,41 @@
 
         #region Private-Methods
 
+        private void ParseRawPathAndQuerystring(string fullUrl)
+        {
+            int schemeEnd = fullUrl.IndexOf("://");
+            if (schemeEnd < 0)
+            {
+                _RawPath = "/";
+                _RawQuerystring = "";
+                return;
+            }
+
+            int pathStart = fullUrl.IndexOf('/', schemeEnd + 3);
+            if (pathStart < 0)
+            {
+                _RawPath = "/";
+                _RawQuerystring = "";
+                return;
+            }
+
+            string pathAndQuery = fullUrl.Substring(pathStart);
+
+            int queryIdx = pathAndQuery.IndexOf('?');
+            if (queryIdx >= 0)
+            {
+                _RawPath = pathAndQuery.Substring(0, queryIdx);
+                _RawQuerystring = pathAndQuery.Substring(queryIdx);
+            }
+            else
+            {
+                _RawPath = pathAndQuery;
+                _RawQuerystring = "";
+            }
+
+            if (String.IsNullOrEmpty(_RawPath)) _RawPath = "/";
+        }
+
         private byte[] Sha256(byte[] bytes)
         {
             if (bytes == null) return null;
@@ -759,27 +828,24 @@
 
             using (SHA256 sha256 = SHA256.Create())
             {
-                using (CryptoStream cs = new CryptoStream(stream, sha256, CryptoStreamMode.Write))
+                byte[] buffer = new byte[_StreamBufferSize];
+                int read = 0;
+
+                while (true)
                 {
-                    byte[] buffer = new byte[_StreamBufferSize];
-                    int read = 0;
-
-                    while (true)
+                    read = stream.Read(buffer, 0, buffer.Length);
+                    if (read > 0)
                     {
-                        read = stream.Read(buffer, 0, buffer.Length);
-                        if (read > 0)
-                        {
-                            cs.Write(buffer, 0, read);
-                        }
-                        else
-                        {
-                            break;
-                        }
+                        sha256.TransformBlock(buffer, 0, read, buffer, 0);
                     }
-
-                    cs.FlushFinalBlock();
+                    else
+                    {
+                        break;
+                    }
                 }
 
+                sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                stream.Seek(0, SeekOrigin.Begin);
                 return sha256.Hash;
             }
         }
@@ -794,17 +860,19 @@
 
         private NameValueCollection SortNameValueCollection(NameValueCollection nvc)
         {
-            SortedDictionary<string, string> sorted = new SortedDictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
+            List<KeyValuePair<string, string>> pairs = new List<KeyValuePair<string, string>>();
 
-            foreach (string key in nvc.AllKeys)
+            for (int i = 0; i < nvc.Count; i++)
             {
-                sorted.Add(key, nvc.Get(key));
+                string key = nvc.GetKey(i);
+                string val = nvc.Get(key);
+                pairs.Add(new KeyValuePair<string, string>(key, val));
             }
 
-            Dictionary<string, string> sortedDict = sorted.OrderBy(k => k.Key, StringComparer.Ordinal).ToDictionary(x => x.Key, x => x.Value);
-            NameValueCollection ret = new NameValueCollection(StringComparer.InvariantCultureIgnoreCase);
+            pairs.Sort((a, b) => String.Compare(a.Key.ToLower(), b.Key.ToLower(), StringComparison.Ordinal));
 
-            foreach (KeyValuePair<string, string> kvp in sortedDict)
+            NameValueCollection ret = new NameValueCollection(StringComparer.InvariantCultureIgnoreCase);
+            foreach (KeyValuePair<string, string> kvp in pairs)
             {
                 ret.Add(kvp.Key, kvp.Value);
             }
@@ -815,22 +883,32 @@
         private string BytesToHexString(byte[] bytes)
         {
             // NOT supported in netstandard2.1!
-            // return Convert.ToHexString(bytes);  
+            // return Convert.ToHexString(bytes);
             return BitConverter.ToString(bytes).Replace("-", "");
         }
 
-        private string UriEncode(string str)
+        private string UriEncode(string str, bool encodeSlash = true)
         {
             StringBuilder sb = new StringBuilder();
-            foreach (char c in str)
+            byte[] utf8Bytes = Encoding.UTF8.GetBytes(str);
+            foreach (byte b in utf8Bytes)
             {
-                if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '~' || c == '.')
+                char c = (char)b;
+                if ((c >= 'A' && c <= 'Z')
+                    || (c >= 'a' && c <= 'z')
+                    || (c >= '0' && c <= '9')
+                    || c == '_'
+                    || c == '-'
+                    || c == '~'
+                    || c == '.'
+                    || (!encodeSlash && c == '/'))
                 {
                     sb.Append(c);
                 }
                 else
                 {
-                    sb.Append('%' + ((int)c).ToString("X2"));
+                    sb.Append('%');
+                    sb.Append(b.ToString("X2"));
                 }
             }
             return sb.ToString();

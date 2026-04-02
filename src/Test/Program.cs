@@ -78,7 +78,7 @@
             _Service =              Inputty.GetString("Service      :", _Service, false);
             string body =           Inputty.GetString("Request body :", null, true);
 
-            if (!_Headers.AllKeys.Contains("host"))
+            if (!_Headers.AllKeys.Any(k => string.Equals(k, "host", StringComparison.OrdinalIgnoreCase)))
                 _Headers.Add("host", _Hostname + ":" + _Port.ToString());
 
             if (!String.IsNullOrEmpty(body))
