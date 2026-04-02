@@ -17,6 +17,8 @@ Encounter an issue or have an enhancement request? Please file an issue or start
 - `V4ChunkSigner` for validating aws-chunked upload payloads
 - `AwsChunkedStreamReader` for parsing aws-chunked encoded streams
 - `SigningKeyBytes` property for accessing raw signing key bytes
+- Server-side validation: `signedHeaders` parameter to restrict canonical request to specified headers
+- Default ignore list: `authorization`, `amz-sdk-invocation-id`, `amz-sdk-request`, and other non-signable headers
 
 ## Standard V4 Signatures
 
@@ -205,6 +207,29 @@ x-amz-checksum-crc32:<base64-value>\r\n    (if trailers present)
 0;chunk-signature=<trailer-signature>\r\n  (if trailers present)
 \r\n
 ```
+
+## Server-Side Signature Validation
+
+When validating signatures on the server side, the server receives ALL request headers but should only include the headers listed in the `SignedHeaders` field of the `Authorization` header. Use the `signedHeaders` constructor overload:
+
+```csharp
+// Parse SignedHeaders from the Authorization header
+// Authorization: AWS4-HMAC-SHA256 Credential=.../aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=...
+List<string> signedHeaders = ParseSignedHeaders(authorizationHeader);
+// e.g. ["host", "x-amz-content-sha256", "x-amz-date"]
+
+V4SignatureResult result = new V4SignatureResult(
+    timestamp, method, url, accessKey, secretKey, region, "s3",
+    allRequestHeaders,     // pass ALL headers from the request
+    signedHeaders,         // only these will be included in the canonical request
+    requestBody,
+    payloadHashMode);
+
+if (!result.Signature.Equals(providedSignature))
+    throw new Exception("Signature mismatch");
+```
+
+Without the `signedHeaders` parameter, the library uses a default ignore list to filter headers. This works for client-side signature generation but may include extra headers during server-side validation (since servers see headers the client did not sign). The `signedHeaders` parameter ensures exact parity with the client's canonical request.
 
 ## API Reference
 

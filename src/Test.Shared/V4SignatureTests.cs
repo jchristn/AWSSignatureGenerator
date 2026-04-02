@@ -1840,6 +1840,211 @@ namespace Test.Shared
                         }
                     }
                 },
+
+                // ================================================================
+                // Signed headers filtering (server-side validation)
+                // ================================================================
+                new TestCase
+                {
+                    Name = "SignedHeaders_FilterToSpecifiedList",
+                    Description = "When signedHeaders list is provided, only those headers are included in canonical request",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection(StringComparer.InvariantCultureIgnoreCase)
+                        {
+                            { "Host", "127.0.0.1:9000" },
+                            { "X-Amz-Date", _ExampleTimestamp },
+                            { "X-Amz-Content-SHA256", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" },
+                            { "Authorization", "AWS4-HMAC-SHA256 Credential=AKID/20150830/us-east-1/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=abcdef" },
+                            { "User-Agent", "aws-sdk-dotnet" },
+                            { "amz-sdk-invocation-id", "some-guid" },
+                            { "amz-sdk-request", "attempt=1; max=3" }
+                        };
+
+                        List<string> signedHeaders = new List<string> { "host", "x-amz-content-sha256", "x-amz-date" };
+
+                        using (V4SignatureResult result = new V4SignatureResult(
+                            _ExampleTimestamp, "GET", "http://127.0.0.1:9000/",
+                            _AwsAccessKey, _AwsSecretKey, "us-east-1", "s3",
+                            headers, signedHeaders))
+                        {
+                            // Only the 3 specified headers should be in SignedHeaders
+                            AssertEqual(3, result.SignedHeaders.Count, "signed header count");
+                            AssertTrue(result.SignedHeaders.Contains("host"), "host in signed headers");
+                            AssertTrue(result.SignedHeaders.Contains("x-amz-content-sha256"), "x-amz-content-sha256 in signed headers");
+                            AssertTrue(result.SignedHeaders.Contains("x-amz-date"), "x-amz-date in signed headers");
+
+                            // Authorization, User-Agent, amz-sdk-* should NOT be included
+                            string canonical = result.CanonicalHeaders;
+                            AssertTrue(!canonical.Contains("authorization"), "authorization not in canonical headers");
+                            AssertTrue(!canonical.Contains("user-agent"), "user-agent not in canonical headers");
+                            AssertTrue(!canonical.Contains("amz-sdk"), "amz-sdk not in canonical headers");
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "SignedHeaders_NullUsesDefaultFiltering",
+                    Description = "When signedHeaders is null, default ignore-list filtering is used",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection(StringComparer.InvariantCultureIgnoreCase)
+                        {
+                            { "Host", "example.com" },
+                            { "X-Amz-Date", _ExampleTimestamp },
+                            { "X-Custom-Header", "custom-value" }
+                        };
+
+                        using (V4SignatureResult withNull = new V4SignatureResult(
+                            _ExampleTimestamp, "GET", "http://example.com/",
+                            _AwsAccessKey, _AwsSecretKey, "us-east-1", "s3",
+                            headers, (List<string>)null))
+                        using (V4SignatureResult withoutParam = new V4SignatureResult(
+                            _ExampleTimestamp, "GET", "http://example.com/",
+                            _AwsAccessKey, _AwsSecretKey, "us-east-1", "s3",
+                            headers))
+                        {
+                            AssertEqual(withoutParam.Signature, withNull.Signature, "signatures match");
+                            AssertEqual(withoutParam.SignedHeaders.Count, withNull.SignedHeaders.Count, "signed header count matches");
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "SignedHeaders_MatchesAwsSdkSignature",
+                    Description = "Server-side validation with signed headers produces same signature as AWSSDK would compute",
+                    TestAction = () =>
+                    {
+                        // Simulate what AWSSDK 4.x sends for a GET / (ListBuckets) request
+                        // The SDK only signs: host, x-amz-content-sha256, x-amz-date
+                        NameValueCollection headers = new NameValueCollection(StringComparer.InvariantCultureIgnoreCase)
+                        {
+                            { "Host", "127.0.0.1:9000" },
+                            { "X-Amz-Date", "20260401T120000Z" },
+                            { "X-Amz-Content-SHA256", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" },
+                            { "User-Agent", "aws-sdk-dotnet-coreclr/4.0.20.2" },
+                            { "amz-sdk-invocation-id", "test-id-123" },
+                            { "amz-sdk-request", "attempt=1; max=1" },
+                            { "Authorization", "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20260401/us-east-1/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=placeholder" }
+                        };
+
+                        List<string> signedHeaders = new List<string> { "host", "x-amz-content-sha256", "x-amz-date" };
+
+                        // Compute with signed headers (server-side validation)
+                        using (V4SignatureResult serverSide = new V4SignatureResult(
+                            "20260401T120000Z", "GET", "http://127.0.0.1:9000/",
+                            _AwsAccessKey, _AwsSecretKey, "us-east-1", "s3",
+                            headers, signedHeaders))
+                        {
+                            // Compute fresh with only the signed headers (simulating what SDK computes)
+                            NameValueCollection sdkHeaders = new NameValueCollection(StringComparer.InvariantCultureIgnoreCase)
+                            {
+                                { "Host", "127.0.0.1:9000" },
+                                { "X-Amz-Date", "20260401T120000Z" },
+                                { "X-Amz-Content-SHA256", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" }
+                            };
+
+                            using (V4SignatureResult clientSide = new V4SignatureResult(
+                                "20260401T120000Z", "GET", "http://127.0.0.1:9000/",
+                                _AwsAccessKey, _AwsSecretKey, "us-east-1", "s3",
+                                sdkHeaders))
+                            {
+                                AssertEqual(clientSide.Signature, serverSide.Signature, "server and client signatures match");
+                            }
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "SignedHeaders_StreamingPayloadTrailerMode",
+                    Description = "StreamingSignedTrailer mode uses correct payload hash literal for seed signature",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection(StringComparer.InvariantCultureIgnoreCase)
+                        {
+                            { "Host", "127.0.0.1:9000" },
+                            { "X-Amz-Date", "20260401T120000Z" },
+                            { "X-Amz-Content-SHA256", "STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER" },
+                            { "Content-Type", "text/plain" },
+                            { "Content-Encoding", "aws-chunked" },
+                            { "X-Amz-Decoded-Content-Length", "5" },
+                            { "Content-Length", "298" },
+                            { "X-Amz-Trailer", "x-amz-checksum-crc32" },
+                            { "x-amz-sdk-checksum-algorithm", "CRC32" }
+                        };
+
+                        List<string> signedHeaders = new List<string>
+                        {
+                            "content-encoding", "content-length", "content-type",
+                            "host", "x-amz-content-sha256", "x-amz-date",
+                            "x-amz-decoded-content-length", "x-amz-sdk-checksum-algorithm", "x-amz-trailer"
+                        };
+
+                        using (V4SignatureResult result = new V4SignatureResult(
+                            "20260401T120000Z", "PUT", "http://127.0.0.1:9000/test-bucket/test.txt",
+                            _AwsAccessKey, _AwsSecretKey, "us-east-1", "s3",
+                            headers, signedHeaders, null, V4PayloadHashEnum.StreamingSignedTrailer))
+                        {
+                            // HashedPayload should be the literal streaming string
+                            AssertEqual("STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER", result.HashedPayload, "hashed payload");
+
+                            // Signature should be 64-char hex
+                            AssertNotNull(result.Signature, "signature");
+                            AssertEqual(64, result.Signature.Length, "signature length");
+                            AssertTrue(IsLowercaseHex(result.Signature), "signature is lowercase hex");
+
+                            // Should only include the specified signed headers
+                            AssertEqual(signedHeaders.Count, result.SignedHeaders.Count, "signed header count");
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "IgnoreList_AuthorizationHeader",
+                    Description = "Authorization header is excluded from canonical request even without explicit signedHeaders",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection(StringComparer.InvariantCultureIgnoreCase)
+                        {
+                            { "Host", "example.com" },
+                            { "X-Amz-Date", _ExampleTimestamp },
+                            { "Authorization", "AWS4-HMAC-SHA256 Credential=..." }
+                        };
+
+                        using (V4SignatureResult result = new V4SignatureResult(
+                            _ExampleTimestamp, "GET", "http://example.com/",
+                            _AwsAccessKey, _AwsSecretKey, "us-east-1", "s3",
+                            headers))
+                        {
+                            AssertTrue(!result.SignedHeaders.Contains("authorization"), "authorization excluded");
+                            AssertTrue(!result.CanonicalHeaders.Contains("authorization"), "authorization not in canonical headers");
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "IgnoreList_SdkInternalHeaders",
+                    Description = "amz-sdk-invocation-id and amz-sdk-request headers are excluded by default",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection(StringComparer.InvariantCultureIgnoreCase)
+                        {
+                            { "Host", "example.com" },
+                            { "X-Amz-Date", _ExampleTimestamp },
+                            { "amz-sdk-invocation-id", "test-id" },
+                            { "amz-sdk-request", "attempt=1; max=3" }
+                        };
+
+                        using (V4SignatureResult result = new V4SignatureResult(
+                            _ExampleTimestamp, "GET", "http://example.com/",
+                            _AwsAccessKey, _AwsSecretKey, "us-east-1", "s3",
+                            headers))
+                        {
+                            AssertTrue(!result.SignedHeaders.Contains("amz-sdk-invocation-id"), "amz-sdk-invocation-id excluded");
+                            AssertTrue(!result.SignedHeaders.Contains("amz-sdk-request"), "amz-sdk-request excluded");
+                        }
+                    }
+                },
             };
         }
 

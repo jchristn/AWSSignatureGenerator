@@ -360,6 +360,24 @@
             <param name="requestBody">Request body (Stream, byte[], or string).</param>
             <param name="payloadHashing">Payload hashing method.</param>
         </member>
+        <member name="M:AWSSignatureGenerator.V4SignatureResult.#ctor(System.String,System.String,System.String,System.String,System.String,System.String,System.String,System.Collections.Specialized.NameValueCollection,System.Collections.Generic.List{System.String},System.Object,AWSSignatureGenerator.V4PayloadHashEnum)">
+            <summary>
+            Instantiate with explicit signed headers list.
+            Use this overload for server-side signature validation where only headers specified
+            in the Authorization header's SignedHeaders field should be included in the canonical request.
+            </summary>
+            <param name="timestamp">Timestamp of the form yyyyMMddTHHmmssZ.</param>
+            <param name="httpMethod">HTTP method.</param>
+            <param name="fullUrl">Full URL.</param>
+            <param name="accessKey">Access key.</param>
+            <param name="secretKey">Secret key.</param>
+            <param name="region">Region.</param>
+            <param name="service">Service.</param>
+            <param name="headers">Request headers.</param>
+            <param name="signedHeaders">List of header names to include in the signature, or null to include all non-ignored headers.</param>
+            <param name="requestBody">Request body (Stream, byte[], or string).</param>
+            <param name="payloadHashing">Payload hashing method.</param>
+        </member>
         <member name="M:AWSSignatureGenerator.V4SignatureResult.ToString">
             <summary>
             Human-readable version of the object.

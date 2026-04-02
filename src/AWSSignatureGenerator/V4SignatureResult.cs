@@ -300,7 +300,13 @@ namespace AWSSignatureGenerator
                         while (val.Contains("  ")) val = val.Replace("  ", " ");
                     }
 
-                    if (!_HeaderIgnoreList.Contains(key))
+                    bool include = false;
+                    if (_SignedHeaderNames != null)
+                        include = _SignedHeaderNames.Contains(key);
+                    else
+                        include = !_HeaderIgnoreList.Contains(key);
+
+                    if (include)
                     {
                         headerPairs.Add(new KeyValuePair<string, string>(key, val));
                     }
@@ -336,7 +342,13 @@ namespace AWSSignatureGenerator
                     {
                         string key = Headers.GetKey(i).ToLower();
 
-                        if (!_HeaderIgnoreList.Contains(key))
+                        bool include = false;
+                        if (_SignedHeaderNames != null)
+                            include = _SignedHeaderNames.Contains(key);
+                        else
+                            include = !_HeaderIgnoreList.Contains(key);
+
+                        if (include)
                         {
                             ret.Add(key);
                         }
@@ -576,8 +588,13 @@ namespace AWSSignatureGenerator
         private static string _ChecksumStreamingSigned = "STREAMING-AWS4-HMAC-SHA256-PAYLOAD";
         private static string _ChecksumStreamingSignedTrailer = "STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER";
 
+        private List<string> _SignedHeaderNames = null;
+
         private static List<string> _HeaderIgnoreList = new List<string>
         {
+            "amz-sdk-invocation-id",
+            "amz-sdk-request",
+            "authorization",
             "connection",
             "expect",
             "keep-alive",
@@ -630,6 +647,38 @@ namespace AWSSignatureGenerator
             NameValueCollection headers,
             object requestBody = null,
             V4PayloadHashEnum payloadHashing = V4PayloadHashEnum.Signed)
+            : this(timestamp, httpMethod, fullUrl, accessKey, secretKey, region, service, headers, null, requestBody, payloadHashing)
+        {
+        }
+
+        /// <summary>
+        /// Instantiate with explicit signed headers list.
+        /// Use this overload for server-side signature validation where only headers specified
+        /// in the Authorization header's SignedHeaders field should be included in the canonical request.
+        /// </summary>
+        /// <param name="timestamp">Timestamp of the form yyyyMMddTHHmmssZ.</param>
+        /// <param name="httpMethod">HTTP method.</param>
+        /// <param name="fullUrl">Full URL.</param>
+        /// <param name="accessKey">Access key.</param>
+        /// <param name="secretKey">Secret key.</param>
+        /// <param name="region">Region.</param>
+        /// <param name="service">Service.</param>
+        /// <param name="headers">Request headers.</param>
+        /// <param name="signedHeaders">List of header names to include in the signature, or null to include all non-ignored headers.</param>
+        /// <param name="requestBody">Request body (Stream, byte[], or string).</param>
+        /// <param name="payloadHashing">Payload hashing method.</param>
+        public V4SignatureResult(
+            string timestamp,
+            string httpMethod,
+            string fullUrl,
+            string accessKey,
+            string secretKey,
+            string region,
+            string service,
+            NameValueCollection headers,
+            List<string> signedHeaders,
+            object requestBody = null,
+            V4PayloadHashEnum payloadHashing = V4PayloadHashEnum.Signed)
         {
             if (String.IsNullOrEmpty(timestamp)) throw new ArgumentNullException(nameof(timestamp));
             if (String.IsNullOrEmpty(httpMethod)) throw new ArgumentNullException(nameof(httpMethod));
@@ -648,6 +697,13 @@ namespace AWSSignatureGenerator
             Region = region;
             Service = service;
             PayloadHash = payloadHashing;
+
+            if (signedHeaders != null && signedHeaders.Count > 0)
+            {
+                _SignedHeaderNames = new List<string>();
+                foreach (string h in signedHeaders)
+                    _SignedHeaderNames.Add(h.ToLower());
+            }
 
             if (headers != null && !headers.AllKeys.Any(k => string.Equals(k, "host", StringComparison.OrdinalIgnoreCase)))
                 throw new ArgumentException("Supplied headers does not include 'host' header.");
