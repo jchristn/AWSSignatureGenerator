@@ -2,13 +2,20 @@
 
 # AWSSignatureGenerator
 
-A .NET class library for generating and validating AWS V4 signatures, including streaming (chunked) signatures used by AWSSDK 4.x. Built using the AWS CLI and boto as a reference implementation.
+A .NET class library for generating and validating AWS V4 signatures and legacy Amazon S3 V2 signatures, including streaming (chunked) V4 signatures used by AWSSDK 4.x. Built using the AWS CLI and boto as a reference implementation.
 
 [![NuGet Version](https://img.shields.io/nuget/v/AWSSignatureGenerator.svg?style=flat)](https://www.nuget.org/packages/AWSSignatureGenerator/) [![NuGet](https://img.shields.io/nuget/dt/AWSSignatureGenerator.svg)](https://www.nuget.org/packages/AWSSignatureGenerator) 
 
 ## Feedback and Enhancements
 
 Encounter an issue or have an enhancement request? Please file an issue or start a discussion here!
+
+## New in v1.1.0
+
+- Legacy Amazon S3 Signature Version 2 header signing with `V2SignatureResult`
+- Legacy Amazon S3 Signature Version 2 signed URLs with `V2SignedUrlResult`
+- Touchstone-backed shared test suites with console, xUnit, and NUnit runners
+- Existing V4 behavior remains unchanged
 
 ## New in v1.0.x
 
@@ -80,6 +87,50 @@ using FileStream fs = File.OpenRead("largefile.bin");
 V4SignatureResult result = new V4SignatureResult(timestamp, "PUT", url, accessKey, secretKey,
     region, "s3", headers, fs, V4PayloadHashEnum.Signed);
 ```
+
+## Legacy S3 V2 Signatures
+
+Use `V2SignatureResult` when you specifically need Amazon S3 Signature Version 2 header authentication. SigV2 is deprecated for AWS S3 and is not supported in many modern AWS S3 scenarios. Prefer V4 unless you are maintaining legacy S3 workflows or interoperating with an S3-compatible service that requires V2.
+
+```csharp
+using AWSSignatureGenerator;
+
+NameValueCollection headers = new NameValueCollection
+{
+    { "Date", "Tue, 27 Mar 2007 19:36:42 +0000" }
+};
+
+using V2SignatureResult result = new V2SignatureResult(
+    "GET",
+    "https://examplebucket.s3.amazonaws.com/photos/puppy.jpg",
+    "AKIDEXAMPLE",
+    "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+    headers);
+
+Console.WriteLine("Signature            : " + result.Signature);
+Console.WriteLine("Authorization header : " + result.AuthorizationHeader);
+```
+
+Important V2 fields exposed by the result include `ContentMd5`, `ContentType`, `DateElement`, `CanonicalizedAmzHeaders`, `CanonicalizedResource`, `StringToSign`, `Signature`, and `AuthorizationHeader`.
+
+## Legacy S3 V2 Signed URLs
+
+Use `V2SignedUrlResult` to generate a legacy S3 SigV2 signed URL. The expiration is expressed as Unix epoch seconds, matching the S3 V2 query-string authentication format.
+
+```csharp
+using AWSSignatureGenerator;
+
+using V2SignedUrlResult result = new V2SignedUrlResult(
+    "GET",
+    "https://examplebucket.s3.amazonaws.com/photos/puppy.jpg",
+    "AKIDEXAMPLE",
+    "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+    1175139620);
+
+Console.WriteLine("Signed URL           : " + result.SignedUrl);
+```
+
+The signed URL includes `AWSAccessKeyId`, `Expires`, and `Signature`. The raw Base64 signature is available through `Signature`, and the RFC 3986 encoded value is available through `EncodedSignature`.
 
 ## Streaming Signatures (AWSSDK 4.x)
 
@@ -258,6 +309,36 @@ Computes and validates streaming chunk and trailer signatures.
 | `ValidateChunk(byte[] chunkData, string providedSignature)` | `bool` | Validate a chunk's signature |
 | `ComputeTrailerSignature(SortedDictionary<string, string> trailerHeaders)` | `string` | Compute expected trailer signature |
 | `ValidateTrailer(SortedDictionary<string, string> trailerHeaders, string providedSignature)` | `bool` | Validate the trailer signature |
+
+### V2SignatureResult
+
+Generates legacy Amazon S3 Signature Version 2 Authorization header signatures.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Signature` | `string` | Final V2 signature as Base64 HMAC-SHA1 |
+| `AuthorizationHeader` | `string` | Complete `Authorization` header value |
+| `ContentMd5` | `string` | `Content-MD5` value included in the string to sign |
+| `ContentType` | `string` | `Content-Type` value included in the string to sign |
+| `DateElement` | `string` | `Date` value included in the string to sign, or empty when `x-amz-date` is signed |
+| `CanonicalizedAmzHeaders` | `string` | Canonicalized `x-amz-*` headers |
+| `CanonicalizedResource` | `string` | S3 canonical resource |
+| `StringToSign` | `string` | Full S3 V2 string to sign |
+
+### V2SignedUrlResult
+
+Generates legacy Amazon S3 Signature Version 2 signed URLs.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `SignedUrl` | `string` | URL containing `AWSAccessKeyId`, `Expires`, and `Signature` |
+| `Signature` | `string` | Raw Base64 HMAC-SHA1 signature |
+| `EncodedSignature` | `string` | RFC 3986 encoded signature query value |
+| `Expires` | `long` | Expiration time as Unix epoch seconds |
+| `ExpiresAt` | `DateTimeOffset` | Expiration time as a UTC date/time |
+| `CanonicalizedAmzHeaders` | `string` | Canonicalized `x-amz-*` headers that signed URL consumers must send |
+| `CanonicalizedResource` | `string` | S3 canonical resource |
+| `StringToSign` | `string` | Full S3 V2 string to sign |
 
 ### AwsChunkedStreamReader
 

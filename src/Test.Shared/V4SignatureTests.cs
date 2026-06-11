@@ -12,7 +12,7 @@ namespace Test.Shared
     /// <summary>
     /// All V4 signature test cases. Used by both Test.Automated and Test.Xunit.
     /// </summary>
-    public static class V4SignatureTests
+    internal static class V4SignatureTests
     {
         private const string _ExampleAccessKey = "AKIDEXAMPLE";
         private const string _ExampleSecretKey = "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY";
@@ -28,7 +28,7 @@ namespace Test.Shared
         /// Retrieve all test cases.
         /// </summary>
         /// <returns>List of test cases.</returns>
-        public static List<TestCase> GetAllTests()
+        internal static List<TestCase> GetAllTests()
         {
             return new List<TestCase>
             {

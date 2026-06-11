@@ -79,6 +79,298 @@
             Trailer signature, if present.
             </summary>
         </member>
+        <member name="T:AWSSignatureGenerator.V2SignatureResult">
+            <summary>
+            AWS Signature Version 2 result for Amazon S3 REST Authorization header signing.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.AccessKey">
+            <summary>
+            AWS access key ID.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.SecretKey">
+            <summary>
+            AWS secret access key.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.HttpMethod">
+            <summary>
+            HTTP method used for the request.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.FullUrl">
+            <summary>
+            Full request URL.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.Protocol">
+            <summary>
+            URL scheme.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.Port">
+            <summary>
+            URL port.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.Hostname">
+            <summary>
+            URL host name.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.Path">
+            <summary>
+            Raw URL path.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.Querystring">
+            <summary>
+            Raw URL query string, including the leading question mark when present.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.QueryElements">
+            <summary>
+            Parsed query string elements.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.Headers">
+            <summary>
+            Request headers.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.ContentMd5">
+            <summary>
+            Content-MD5 header value used in the string to sign, or an empty string when absent.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.ContentType">
+            <summary>
+            Content-Type header value used in the string to sign, or an empty string when absent.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.Date">
+            <summary>
+            Date header value, or an empty string when absent.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.DateElement">
+            <summary>
+            Date element used in the string to sign. Empty when an x-amz-date header is present.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.CanonicalizedAmzHeaders">
+            <summary>
+            Canonicalized x-amz-* headers used in the string to sign.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.CanonicalizedResource">
+            <summary>
+            Canonicalized S3 resource used in the string to sign.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.StringToSign">
+            <summary>
+            S3 Signature Version 2 string to sign.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.Signature">
+            <summary>
+            Base64 HMAC-SHA1 signature.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignatureResult.AuthorizationHeader">
+            <summary>
+            Complete S3 Signature Version 2 Authorization header value.
+            </summary>
+        </member>
+        <member name="M:AWSSignatureGenerator.V2SignatureResult.#ctor(System.String,System.String,System.String,System.String,System.Collections.Specialized.NameValueCollection,System.String)">
+            <summary>
+            Instantiate an S3 Signature Version 2 header signing result.
+            </summary>
+            <param name="httpMethod">HTTP method.</param>
+            <param name="fullUrl">Full request URL.</param>
+            <param name="accessKey">AWS access key ID.</param>
+            <param name="secretKey">AWS secret access key.</param>
+            <param name="headers">Request headers. Must include Date or x-amz-date for header signing.</param>
+            <param name="bucketName">Optional explicit S3 bucket name for custom endpoints and CNAMEs.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when a required string argument is null or empty.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when the URL is invalid or the request lacks Date and x-amz-date headers.</exception>
+        </member>
+        <member name="M:AWSSignatureGenerator.V2SignatureResult.ToString">
+            <summary>
+            Human-readable representation of the V2 signature result.
+            </summary>
+            <returns>Diagnostic string containing canonical fields and signature output.</returns>
+        </member>
+        <member name="M:AWSSignatureGenerator.V2SignatureResult.Dispose(System.Boolean)">
+            <summary>
+            Dispose.
+            </summary>
+            <param name="disposing">True when called from Dispose.</param>
+        </member>
+        <member name="M:AWSSignatureGenerator.V2SignatureResult.Dispose">
+            <summary>
+            Dispose.
+            </summary>
+        </member>
+        <member name="T:AWSSignatureGenerator.V2SignedUrlResult">
+            <summary>
+            AWS Signature Version 2 result for Amazon S3 signed URLs.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.AccessKey">
+            <summary>
+            AWS access key ID.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.SecretKey">
+            <summary>
+            AWS secret access key.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.HttpMethod">
+            <summary>
+            HTTP method used for the signed URL.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.FullUrl">
+            <summary>
+            Original full URL before signing.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.Protocol">
+            <summary>
+            URL scheme.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.Port">
+            <summary>
+            URL port.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.Hostname">
+            <summary>
+            URL host name.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.Path">
+            <summary>
+            Raw URL path.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.Querystring">
+            <summary>
+            Raw URL query string, including the leading question mark when present.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.QueryElements">
+            <summary>
+            Parsed query string elements from the original URL.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.Headers">
+            <summary>
+            Request headers that must be supplied by the signed URL consumer when signed.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.Expires">
+            <summary>
+            Expiration time as Unix epoch seconds.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.ExpiresAt">
+            <summary>
+            Expiration time as a UTC DateTimeOffset.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.ContentMd5">
+            <summary>
+            Content-MD5 header value used in the string to sign, or an empty string when absent.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.ContentType">
+            <summary>
+            Content-Type header value used in the string to sign, or an empty string when absent.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.CanonicalizedAmzHeaders">
+            <summary>
+            Canonicalized x-amz-* headers used in the string to sign.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.CanonicalizedResource">
+            <summary>
+            Canonicalized S3 resource used in the string to sign.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.StringToSign">
+            <summary>
+            S3 Signature Version 2 string to sign.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.Signature">
+            <summary>
+            Base64 HMAC-SHA1 signature.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.EncodedSignature">
+            <summary>
+            RFC 3986 encoded signature value for use in the query string.
+            </summary>
+        </member>
+        <member name="P:AWSSignatureGenerator.V2SignedUrlResult.SignedUrl">
+            <summary>
+            Signed URL containing AWSAccessKeyId, Expires, and Signature query parameters.
+            </summary>
+        </member>
+        <member name="M:AWSSignatureGenerator.V2SignedUrlResult.#ctor(System.String,System.String,System.String,System.String,System.Int64,System.Collections.Specialized.NameValueCollection,System.String)">
+            <summary>
+            Instantiate an S3 Signature Version 2 signed URL result.
+            </summary>
+            <param name="httpMethod">HTTP method.</param>
+            <param name="fullUrl">Full request URL before signing.</param>
+            <param name="accessKey">AWS access key ID.</param>
+            <param name="secretKey">AWS secret access key.</param>
+            <param name="expires">Expiration time as Unix epoch seconds. Must be greater than zero.</param>
+            <param name="headers">Optional headers that participate in the signature.</param>
+            <param name="bucketName">Optional explicit S3 bucket name for custom endpoints and CNAMEs.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when a required string argument is null or empty.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when expires is less than one.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when the URL is invalid or already contains SigV2 auth query parameters.</exception>
+        </member>
+        <member name="M:AWSSignatureGenerator.V2SignedUrlResult.#ctor(System.String,System.String,System.String,System.String,System.DateTimeOffset,System.Collections.Specialized.NameValueCollection,System.String)">
+            <summary>
+            Instantiate an S3 Signature Version 2 signed URL result.
+            </summary>
+            <param name="httpMethod">HTTP method.</param>
+            <param name="fullUrl">Full request URL before signing.</param>
+            <param name="accessKey">AWS access key ID.</param>
+            <param name="secretKey">AWS secret access key.</param>
+            <param name="expiresAt">Expiration time.</param>
+            <param name="headers">Optional headers that participate in the signature.</param>
+            <param name="bucketName">Optional explicit S3 bucket name for custom endpoints and CNAMEs.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when a required string argument is null or empty.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when expiresAt converts to a value less than one.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when the URL is invalid or already contains SigV2 auth query parameters.</exception>
+        </member>
+        <member name="M:AWSSignatureGenerator.V2SignedUrlResult.ToString">
+            <summary>
+            Human-readable representation of the V2 signed URL result.
+            </summary>
+            <returns>Diagnostic string containing canonical fields and signed URL output.</returns>
+        </member>
+        <member name="M:AWSSignatureGenerator.V2SignedUrlResult.Dispose(System.Boolean)">
+            <summary>
+            Dispose.
+            </summary>
+            <param name="disposing">True when called from Dispose.</param>
+        </member>
+        <member name="M:AWSSignatureGenerator.V2SignedUrlResult.Dispose">
+            <summary>
+            Dispose.
+            </summary>
+        </member>
         <member name="T:AWSSignatureGenerator.V4ChunkSigner">
             <summary>
             Computes and validates AWS V4 streaming (chunked) signatures.

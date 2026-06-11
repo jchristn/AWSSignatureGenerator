@@ -5,17 +5,17 @@
 		<ApplicationIcon>icon.ico</ApplicationIcon>
 		<GenerateDocumentationFile>True</GenerateDocumentationFile>
 		<DocumentationFile>AWSSignatureGenerator.xml</DocumentationFile>
-		<Version>1.0.12</Version>
+		<Version>1.1.0</Version>
 		<Authors>Joel Christner</Authors>
-		<Description>A simple class library for generating AWS V4 signatures.</Description>
+		<Description>A class library for generating and validating AWS V4 signatures and legacy Amazon S3 V2 signatures.</Description>
 		<Copyright>(c)2026 Joel Christner</Copyright>
 		<PackageProjectUrl>https://github.com/jchristn/AWSSignatureGenerator</PackageProjectUrl>
 		<PackageIcon>icon.png</PackageIcon>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<RepositoryUrl>https://github.com/jchristn/AWSSignatureGenerator</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
-		<PackageTags>aws signature v4 authorization</PackageTags>
-		<PackageReleaseNotes>Initial release</PackageReleaseNotes>
+		<PackageTags>aws signature v4 v2 s3 authorization presigned legacy</PackageTags>
+		<PackageReleaseNotes>Additive legacy Amazon S3 Signature Version 2 header signing and signed URL support. AWS V4 behavior is unchanged.</PackageReleaseNotes>
 		<PackageLicenseFile>LICENSE.md</PackageLicenseFile>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<IncludeSymbols>True</IncludeSymbols>

@@ -5,7 +5,7 @@ namespace Test.Shared
     /// <summary>
     /// Represents a single test case with a name, description, and action to execute.
     /// </summary>
-    public class TestCase
+    internal sealed class TestCase
     {
         /// <summary>
         /// Test case name.

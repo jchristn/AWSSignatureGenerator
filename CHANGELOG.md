@@ -2,10 +2,15 @@
 
 ## Current Version
 
-v1.0.x
+v1.1.0
 
-- Initial release supporting V4 signatures
+- Additive legacy Amazon S3 Signature Version 2 header signing support
+- Additive legacy Amazon S3 Signature Version 2 signed URL support
+- Touchstone-based shared test infrastructure with console, xUnit, and NUnit runners
+- Existing V4 behavior remains unchanged
 
 ## Previous Versions
 
-Notes from previous versions will be added here.
+### v1.0.x
+
+- Initial release supporting V4 signatures
