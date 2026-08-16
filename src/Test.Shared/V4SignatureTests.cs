@@ -6,6 +6,7 @@ namespace Test.Shared
     using System.IO;
     using System.Security.Cryptography;
     using System.Text;
+    using System.Threading;
     using System.Threading.Tasks;
     using AWSSignatureGenerator;
 
@@ -2042,6 +2043,151 @@ namespace Test.Shared
                         {
                             AssertTrue(!result.SignedHeaders.Contains("amz-sdk-invocation-id"), "amz-sdk-invocation-id excluded");
                             AssertTrue(!result.SignedHeaders.Contains("amz-sdk-request"), "amz-sdk-request excluded");
+                        }
+                    }
+                },
+
+                // ================================================================
+                // V4ChunkSigner / AwsChunkedStreamReader — additional edge and
+                // negative cases (gaps: null-trailer validation, ValidateTrailer
+                // failure path, disposed reader, malformed/empty wire, cancellation)
+                // ================================================================
+                new TestCase
+                {
+                    Name = "ChunkSigner_ComputeTrailerSignature_NullTrailers_Throws",
+                    Description = "ComputeTrailerSignature throws ArgumentNullException when trailer headers are null",
+                    TestAction = () =>
+                    {
+                        byte[] dummyKey = new byte[32];
+                        using (V4ChunkSigner signer = new V4ChunkSigner(
+                            _ExampleTimestamp, _ExampleRegion, _ExampleService, dummyKey, "seedsignature"))
+                        {
+                            AssertThrows<ArgumentNullException>(() => signer.ComputeTrailerSignature(null));
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "ChunkSigner_ValidateTrailer_WrongSignature_ReturnsFalse",
+                    Description = "ValidateTrailer returns false for an incorrect trailer signature",
+                    TestAction = () =>
+                    {
+                        NameValueCollection headers = new NameValueCollection
+                        {
+                            { "host", "example.com" },
+                            { "x-amz-date", _ExampleTimestamp },
+                            { "x-amz-content-sha256", "STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER" }
+                        };
+
+                        using (V4SignatureResult result = new V4SignatureResult(
+                            _ExampleTimestamp, "PUT", "http://example.com/bucket/key", _ExampleAccessKey, _ExampleSecretKey,
+                            _ExampleRegion, _ExampleService, headers, null, V4PayloadHashEnum.StreamingSignedTrailer))
+                        {
+                            SortedDictionary<string, string> trailers = new SortedDictionary<string, string>
+                            {
+                                { "x-amz-checksum-crc32", "aBC123==" }
+                            };
+
+                            using (V4ChunkSigner signer = new V4ChunkSigner(
+                                _ExampleTimestamp, _ExampleRegion, _ExampleService,
+                                result.SigningKeyBytes, result.Signature))
+                            {
+                                signer.ComputeChunkSignature(null); // final chunk
+                                AssertTrue(!signer.ValidateTrailer(trailers, "0000000000000000000000000000000000000000000000000000000000000000"),
+                                    "ValidateTrailer should return false for wrong signature");
+                            }
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "AwsChunkedStreamReader_ReadAfterDispose_Throws",
+                    Description = "ReadNextChunkAsync throws ObjectDisposedException after the reader is disposed",
+                    TestAction = () =>
+                    {
+                        string wire =
+                            "5;chunk-signature=aaaa\r\n" +
+                            "Hello\r\n" +
+                            "0;chunk-signature=bbbb\r\n" +
+                            "\r\n";
+
+                        using (MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(wire)))
+                        {
+                            AwsChunkedStreamReader reader = new AwsChunkedStreamReader(ms);
+                            reader.Dispose();
+                            AssertThrows<ObjectDisposedException>(() => reader.ReadNextChunkAsync().GetAwaiter().GetResult());
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "AwsChunkedStreamReader_MalformedHeader_NoSemicolon_ReturnsNull",
+                    Description = "A chunk header line with no semicolon yields a null result (nothing to read)",
+                    TestAction = () =>
+                    {
+                        string wire = "this-is-not-a-valid-chunk-header\r\n";
+
+                        using (MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(wire)))
+                        using (AwsChunkedStreamReader reader = new AwsChunkedStreamReader(ms))
+                        {
+                            AwsChunkResult result = reader.ReadNextChunkAsync().GetAwaiter().GetResult();
+                            AssertTrue(result == null, "Malformed header without ';' should return null");
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "AwsChunkedStreamReader_EmptyStream_ReturnsNull",
+                    Description = "An empty stream returns null on the first read",
+                    TestAction = () =>
+                    {
+                        using (MemoryStream ms = new MemoryStream(Array.Empty<byte>()))
+                        using (AwsChunkedStreamReader reader = new AwsChunkedStreamReader(ms))
+                        {
+                            AwsChunkResult result = reader.ReadNextChunkAsync().GetAwaiter().GetResult();
+                            AssertTrue(result == null, "Empty stream should return null");
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "AwsChunkedStreamReader_OnlyFinalChunk_NoData",
+                    Description = "A stream with only the zero-length final chunk yields a single final result with empty data",
+                    TestAction = () =>
+                    {
+                        string wire =
+                            "0;chunk-signature=finalsig\r\n" +
+                            "\r\n";
+
+                        using (MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(wire)))
+                        using (AwsChunkedStreamReader reader = new AwsChunkedStreamReader(ms))
+                        {
+                            AwsChunkResult chunk = reader.ReadNextChunkAsync().GetAwaiter().GetResult();
+                            AssertNotNull(chunk, "final chunk");
+                            AssertEqual(true, chunk.IsFinal, "chunk should be final");
+                            AssertEqual(0, chunk.Data.Length, "final chunk data should be empty");
+                            AssertEqual("finalsig", chunk.Signature, "final chunk signature");
+                        }
+                    }
+                },
+                new TestCase
+                {
+                    Name = "AwsChunkedStreamReader_CancelledToken_Throws",
+                    Description = "ReadNextChunkAsync observes cancellation via an already-cancelled token",
+                    TestAction = () =>
+                    {
+                        string wire =
+                            "5;chunk-signature=aaaa\r\n" +
+                            "Hello\r\n" +
+                            "0;chunk-signature=bbbb\r\n" +
+                            "\r\n";
+
+                        using (MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(wire)))
+                        using (AwsChunkedStreamReader reader = new AwsChunkedStreamReader(ms))
+                        using (CancellationTokenSource cts = new CancellationTokenSource())
+                        {
+                            cts.Cancel();
+                            AssertThrows<OperationCanceledException>(() => reader.ReadNextChunkAsync(cts.Token).GetAwaiter().GetResult());
                         }
                     }
                 },
